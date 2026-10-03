@@ -28,7 +28,10 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - uses: android-actions/setup-android@v3
+      # The runner image ships the Android SDK, with ANDROID_HOME set and the
+      # licenses accepted; the Android Gradle plugin finds it from there.
+      - name: Check Android SDK
+        run: test -d "$ANDROID_HOME" && echo "ANDROID_HOME=$ANDROID_HOME"
 
       - uses: gradle/actions/setup-gradle@v4
 
