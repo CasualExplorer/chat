@@ -11,7 +11,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.SavedStateHandleSaveableApi
 import androidx.lifecycle.viewmodel.compose.saveable
+import com.casualexplorer.chat.core.AssistantMessage
 import com.casualexplorer.chat.core.ChatState
+import com.casualexplorer.chat.core.UserMessage
 import com.casualexplorer.chat.data.ChatRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -94,6 +96,25 @@ class ChatViewModel @Inject constructor(
     }
 
     fun stop() = session.cancel()
+
+    /**
+     * Sends again the message of the last reply, if that failed or was
+     * stopped, as if typed again. If the message is back in the input, it
+     * is taken out.
+     */
+    fun retry() {
+        val state = session.state.value
+        val last = state.messages.lastOrNull() as? AssistantMessage ?: return
+        if (state.streaming || !last.failed) return
+        val question = state.messages.getOrNull(state.messages.size - 2) as? UserMessage ?: return
+        if (chat.settings.value?.hasKey(state.active) != true) {
+            userMessage.value = "Add your ${state.providerNames.getOrElse(state.active) { "" }} API key in Settings."
+            return
+        }
+        val before = draft
+        if (draft.text.trim() == question.text) draft = TextFieldValue()
+        if (!session.submit(question.text)) draft = before
+    }
 
     /** Shows the previous message sent; false if there is none. */
     fun historyPrevious(): Boolean {

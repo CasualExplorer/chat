@@ -1,8 +1,12 @@
 package com.casualexplorer.chat.ui
 
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
@@ -26,6 +30,7 @@ data object SettingsKey : NavKey
  */
 @Composable
 fun ChatApp(
+    onDarkThemeChange: (Boolean) -> Unit,
     chatViewModel: ChatViewModel = viewModel(),
     settingsViewModel: SettingsViewModel = viewModel(),
 ) {
@@ -35,7 +40,18 @@ fun ChatApp(
     // Settings opens over the chat until there is a key to use.
     val start = if (settings.hasKey(0) || settings.hasKey(1)) arrayOf<NavKey>(ChatKey) else arrayOf(ChatKey, SettingsKey)
     val backStack = rememberNavBackStack(*start)
+    val dark = settings.theme.isDark()
+    LaunchedEffect(dark) { onDarkThemeChange(dark) }
 
+    ChatTheme(darkTheme = dark, dynamicColor = settings.dynamicColor) {
+        Surface(color = MaterialTheme.colorScheme.background) {
+            Screens(backStack, chatViewModel, settingsViewModel)
+        }
+    }
+}
+
+@Composable
+private fun Screens(backStack: NavBackStack<NavKey>, chatViewModel: ChatViewModel, settingsViewModel: SettingsViewModel) {
     NavDisplay(
         backStack = backStack,
         onBack = { backStack.removeLastOrNull() },

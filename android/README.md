@@ -23,11 +23,12 @@ There are no environment variables on Android, so the app opens on Settings unti
 
 ## Use
 
-- **Model bar** (top): tap the model to switch model or provider; the conversation carries over. The picker lists the models each API serves from Claude 4.6 and GPT-5.6 on, and a filter that matches nothing can be used as a model ID. Tap "Reasoning …" to set the active provider's effort. Each provider keeps its own effort, and an effort the model doesn't support is lowered to the nearest level it does, for Claude models. The bar also shows how full the context window is after a reply ("12% (24.5K)", with ⚠ past 80%), or just the token count for OpenAI, whose API doesn't report context windows.
-- **+** starts a new chat.
-- **Send / Stop**: while a reply streams, Send becomes Stop.
-- **Thinking**: the reasoning summary streams into a muted box above the reply (Anthropic `thinking.display: "summarized"`, OpenAI `reasoning.summary: "auto"`). A long one shows its last 10 lines until tapped.
-- **Footer**: each finished reply shows "◇ model via Provider in 2.3s · 12.4K in · 845 out" and a **copy** action for its markdown. Text in messages can be selected.
+- **Top bar**: the model, with the provider, the reasoning effort sent and how full the context window is ("12% of context", in the error colour past 80%; just the token count for OpenAI, whose API doesn't report context windows). Tap it to switch model or provider (the conversation carries over) and set the active provider's reasoning effort. The picker lists the models each API serves from Claude 4.6 and GPT-5.6 on, and a filter that matches nothing can be used as a model ID. Each provider keeps its own effort, and an effort the model doesn't support is lowered to the nearest level it does, for Claude models.
+- **Messages**: yours in bubbles on the end side, replies on the start side, grouped by sender with times and date headers. Long-press a message to copy, share or select its text. While a reply waits for its first words, a typing indicator shows how long it has been.
+- **Thinking**: the reasoning summary streams into a card above the reply (Anthropic `thinking.display: "summarized"`, OpenAI `reasoning.summary: "auto"`). A long one shows its last 10 lines until its header is tapped.
+- **Footer**: each finished reply shows "gpt-5.6-luna · 2.3s · 12.4K in · 845 out · 10:42".
+- **Send / Stop**: while a reply streams, Send becomes Stop. A failed or stopped last reply offers Retry, which sends its message again.
+- **Appearance**: light, dark or the system's, with Material You colours from the wallpaper on Android 12 and later (Settings).
 - **Hardware keyboard**: Enter sends (Shift+Enter is a new line), Up/Down at the start/end of the input step through the messages sent this session, and Esc goes back to the draft.
 
 A reply that fails or is stopped stays in the chat, ending in an ERROR banner with the reason, or "Canceled". Any text that arrived is kept and sent with later turns. If none arrived, the message is left out of later requests and put back in the input to resend.
@@ -57,4 +58,4 @@ The tests port `request_test.go` (against a local HTTP server), `provider_test.g
 
 ## License
 
-The adapted code is Copyright 2025-2026 Charmbracelet, Inc., used under [FSL-1.1-MIT](https://github.com/charmbracelet/crush/blob/main/LICENSE.md), which permits use other than in a competing commercial product. This covers the streaming markdown cache and its tests (`core/.../markdown/StreamingMarkdown.kt`, `MarkdownStreamTest.kt`), the message model (`ChatSession.kt`), the prompt history (`PromptHistory.kt`), and the palette, message styles and spinner (`app/.../ui/Theme.kt`, `MarkdownView.kt`, `MessageViews.kt`). It is adapted from [Crush](https://github.com/charmbracelet/crush) by way of the Go app, and each file says so in its header.
+The adapted code is Copyright 2025-2026 Charmbracelet, Inc., used under [FSL-1.1-MIT](https://github.com/charmbracelet/crush/blob/main/LICENSE.md), which permits use other than in a competing commercial product. This covers the streaming markdown cache and its tests (`core/.../markdown/StreamingMarkdown.kt`, `MarkdownStreamTest.kt`), the message model (`ChatSession.kt`) and the prompt history (`PromptHistory.kt`). The Android UI no longer uses Crush's palette, styles or spinner. It is adapted from [Crush](https://github.com/charmbracelet/crush) by way of the Go app, and each file says so in its header.

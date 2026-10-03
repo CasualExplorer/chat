@@ -1,0 +1,126 @@
+package com.casualexplorer.chat.ui
+
+import android.app.Application
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import com.casualexplorer.chat.core.AssistantMessage
+import com.casualexplorer.chat.core.UserMessage
+import org.junit.Assert.assertEquals
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36], application = Application::class)
+class ChatScreenTest {
+    @get:Rule
+    val composeRule = createComposeRule()
+
+    private fun reply(id: Long, text: String = "", thinking: String = "", pending: Boolean = false, failure: String = "") =
+        AssistantMessage(id, "OpenAI", "gpt-5.6-luna", text = text, thinking = thinking, pending = pending, failure = failure, thinkForMs = 800)
+
+    @Test
+    fun sendIsEnabledOnlyWithText() {
+        var input by mutableStateOf("")
+        var sent = 0
+        composeRule.setContent {
+            ChatTheme(dynamicColor = false) {
+                ChatScreen(
+                    uiState = SampleData.noKey.copy(hasKey = true),
+                    input = androidx.compose.ui.text.input.TextFieldValue(input),
+                    onInputChange = {}, onSend = { sent++ }, onStop = {}, onRetry = {},
+                    onHistoryPrevious = { false }, onHistoryNext = { false }, onHistoryEscape = { false },
+                    onSelectModel = { _, _ -> }, onSelectEffort = {}, onNewChat = {}, onToggleThinking = {},
+                    onUserMessageShown = {}, onOpenSettings = {},
+                )
+            }
+        }
+        composeRule.onNodeWithContentDescription("Send").assertIsNotEnabled()
+        input = "Hello"
+        composeRule.onNodeWithContentDescription("Send").assertIsEnabled().performClick()
+        assertEquals(1, sent)
+    }
+
+    @Test
+    fun stopReplacesSendWhileAReplyStreams() {
+        var stopped = 0
+        val streaming = SampleData.conversation.copy(
+            chat = SampleData.chat.copy(
+                streaming = true,
+                messages = listOf(UserMessage(1, "Hi"), reply(2, text = "Hel", pending = true)),
+            ),
+        )
+        composeRule.setContent {
+            ChatTheme(dynamicColor = false) {
+                ChatScreen(
+                    uiState = streaming,
+                    input = androidx.compose.ui.text.input.TextFieldValue(""),
+                    onInputChange = {}, onSend = {}, onStop = { stopped++ }, onRetry = {},
+                    onHistoryPrevious = { false }, onHistoryNext = { false }, onHistoryEscape = { false },
+                    onSelectModel = { _, _ -> }, onSelectEffort = {}, onNewChat = {}, onToggleThinking = {},
+                    onUserMessageShown = {}, onOpenSettings = {},
+                )
+            }
+        }
+        composeRule.onAllNodesWithContentDescription("Send").assertCountEquals(0)
+        composeRule.onNodeWithContentDescription("Stop the reply").performClick()
+        assertEquals(1, stopped)
+    }
+
+    @Test
+    fun aLongThinkingSummaryExpandsWhenItsHeaderIsTapped() {
+        val thinking = (1..15).joinToString("\n\n") { "Step $it." }
+        var expanded by mutableStateOf(emptySet<Long>())
+        composeRule.setContent {
+            ChatTheme(dynamicColor = false) {
+                ChatScreenSample(
+                    SampleData.conversation.copy(
+                        chat = SampleData.chat.copy(messages = listOf(UserMessage(1, "Hi"), reply(2, text = "Done.", thinking = thinking))),
+                        expandedThinking = expanded,
+                    ),
+                    onToggleThinking = { id -> expanded = if (id in expanded) expanded - id else expanded + id },
+                )
+            }
+        }
+        composeRule.onAllNodesWithText("Step 1.").assertCountEquals(0)
+        composeRule.onNodeWithText("Thought for 0.8s").performClick()
+        composeRule.onNodeWithText("Step 1.").assertExists()
+    }
+
+    @Test
+    fun onlyTheFailedLastReplyOffersRetry() {
+        var retried = 0
+        composeRule.setContent {
+            ChatTheme(dynamicColor = false) {
+                ChatScreenSample(
+                    SampleData.conversation.copy(
+                        chat = SampleData.chat.copy(
+                            messages = listOf(
+                                UserMessage(1, "One"),
+                                reply(2, failure = "Earlier failure"),
+                                UserMessage(3, "Two"),
+                                reply(4, failure = "Boom"),
+                            ),
+                        ),
+                    ),
+                    onRetry = { retried++ },
+                )
+            }
+        }
+        composeRule.onAllNodesWithText("Retry").assertCountEquals(1)
+        composeRule.onNodeWithText("Retry").performClick()
+        assertEquals(1, retried)
+    }
+}

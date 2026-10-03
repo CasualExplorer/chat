@@ -18,6 +18,9 @@ data class UserSettings(
     val openaiModel: String = DEFAULT_OPENAI_MODEL,
     val anthropicEffort: String = DEFAULT_EFFORT,
     val openaiEffort: String = DEFAULT_EFFORT,
+    val theme: ThemeMode = ThemeMode.System,
+    /** Material You colours from the wallpaper, on Android 12 and later. */
+    val dynamicColor: Boolean = true,
 ) {
     /** Whether provider [index] (0 Anthropic, 1 OpenAI) has a key. */
     fun hasKey(index: Int) = if (index == 0) anthropicKey.isNotEmpty() else openaiKey.isNotEmpty()
@@ -33,6 +36,9 @@ data class UserSettings(
         const val DEFAULT_EFFORT = "medium"
     }
 }
+
+/** Light, dark, or following the system. */
+enum class ThemeMode { System, Light, Dark }
 
 /**
  * A server address as stored: trimmed, without a trailing slash, blank for

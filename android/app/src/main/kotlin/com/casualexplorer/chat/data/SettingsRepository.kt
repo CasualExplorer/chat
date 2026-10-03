@@ -48,6 +48,8 @@ class DataStoreSettingsRepository @Inject constructor(
             openaiModel = p[Keys.OPENAI_MODEL]?.takeIf { it.isNotBlank() } ?: defaults.openaiModel,
             anthropicEffort = p[Keys.ANTHROPIC_EFFORT]?.takeIf { it in EFFORTS } ?: defaults.anthropicEffort,
             openaiEffort = p[Keys.OPENAI_EFFORT]?.takeIf { it in EFFORTS } ?: defaults.openaiEffort,
+            theme = ThemeMode.entries.firstOrNull { it.name == p[Keys.THEME] } ?: defaults.theme,
+            dynamicColor = p[Keys.DYNAMIC_COLOR] ?: defaults.dynamicColor,
         )
     }.distinctUntilChanged()
 
@@ -62,6 +64,8 @@ class DataStoreSettingsRepository @Inject constructor(
             p[Keys.OPENAI_MODEL] = settings.openaiModel.trim()
             p[Keys.ANTHROPIC_EFFORT] = settings.anthropicEffort
             p[Keys.OPENAI_EFFORT] = settings.openaiEffort
+            p[Keys.THEME] = settings.theme.name
+            p[Keys.DYNAMIC_COLOR] = settings.dynamicColor
         }
     }
 }
@@ -80,6 +84,8 @@ internal object Keys {
     val OPENAI_BASE_URL = stringPreferencesKey("openai_base_url")
     val ANTHROPIC_KEY = stringPreferencesKey("anthropic_api_key_encrypted")
     val OPENAI_KEY = stringPreferencesKey("openai_api_key_encrypted")
+    val THEME = stringPreferencesKey("theme")
+    val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
     val SECRETS_MIGRATED = booleanPreferencesKey("legacy_secrets_migrated")
 }
 

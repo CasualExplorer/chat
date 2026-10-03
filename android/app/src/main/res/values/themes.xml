@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Compose draws everything; this only sets the window before it does. -->
-    <style name="Theme.Chat" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">@color/pepper</item>
-        <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:navigationBarColor">@android:color/transparent</item>
-    </style>
+    <!-- Compose draws everything; this only sets the window, light or dark
+         by the system, until it does. -->
+    <style name="Theme.Chat" parent="android:Theme.Material.Light.NoActionBar" />
 </resources>

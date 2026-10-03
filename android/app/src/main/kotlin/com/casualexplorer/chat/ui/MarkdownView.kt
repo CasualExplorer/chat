@@ -1,9 +1,5 @@
 package com.casualexplorer.chat.ui
 
-// The markdown styles follow Crush's glamour themes
-// (github.com/charmbracelet/crush, internal/ui/styles), Copyright 2025-2026
-// Charmbracelet, Inc., used under FSL-1.1-MIT.
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -18,13 +14,21 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
@@ -37,7 +41,6 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.casualexplorer.chat.core.markdown.CodeHighlighter
 import com.casualexplorer.chat.core.markdown.MdAlign
 import com.casualexplorer.chat.core.markdown.MdBlock
@@ -54,21 +57,38 @@ import com.casualexplorer.chat.core.markdown.TokenKind
 import com.casualexplorer.chat.core.markdown.parseInline
 import com.casualexplorer.chat.core.markdown.Markdown as MarkdownParser
 
-/** How markdown is drawn: the reply theme, or the muted one of the thinking box. */
+/** How markdown is drawn. Text takes the content colour of where it is drawn. */
 @Immutable
 data class MdStyle(
-    val text: Color,
-    val quiet: Boolean,
+    /** Smaller text, for the thinking summary. */
+    val compact: Boolean = false,
     /** Typed line breaks are kept, as in user messages. */
     val keepNewlines: Boolean = false,
 )
 
-val ReplyStyle = MdStyle(text = Palette.FgSubtle, quiet = false)
-val UserStyle = MdStyle(text = Palette.FgSubtle, quiet = false, keepNewlines = true)
-val QuietStyle = MdStyle(text = Palette.FgMoreSubtle, quiet = true)
+/** The colours inline markdown is drawn in, resolved from the theme. */
+@Immutable
+data class MdColors(
+    val text: Color,
+    val link: Color,
+    val muted: Color,
+    val codeBackground: Color,
+)
 
-private val bodyText = TextStyle(fontFamily = Mono, fontSize = 14.sp, lineHeight = 20.sp)
-private val codeText = TextStyle(fontFamily = Mono, fontSize = 13.sp, lineHeight = 18.sp)
+@Composable
+private fun mdColors(): MdColors {
+    val scheme = MaterialTheme.colorScheme
+    return MdColors(
+        text = LocalContentColor.current,
+        link = scheme.primary,
+        muted = scheme.onSurfaceVariant,
+        codeBackground = scheme.surfaceContainerHighest,
+    )
+}
+
+@Composable
+private fun bodyStyle(style: MdStyle): TextStyle =
+    if (style.compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge
 
 /**
  * Renders markdown that may still be streaming. While [streaming], blocks
@@ -92,7 +112,7 @@ fun Markdown(text: String, streaming: Boolean, style: MdStyle, modifier: Modifie
 
 @Composable
 fun MarkdownBlocks(blocks: List<MdBlock>, style: MdStyle, modifier: Modifier = Modifier) {
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(if (style.compact) 6.dp else 10.dp)) {
         blocks.forEachIndexed { i, block ->
             key(i) { BlockView(block, style) }
         }
@@ -101,70 +121,69 @@ fun MarkdownBlocks(blocks: List<MdBlock>, style: MdStyle, modifier: Modifier = M
 
 @Composable
 private fun BlockView(block: MdBlock, style: MdStyle) {
+    val colors = mdColors()
     when (block) {
         is MdParagraph -> InlineText(block.text, style)
         is MdHeading -> HeadingView(block, style)
-        is MdCodeBlock -> CodeBlockView(block, style)
+        is MdCodeBlock -> CodeBlockView(block)
         is MdQuote -> Row(Modifier.height(IntrinsicSize.Min)) {
-            Box(Modifier.width(2.dp).fillMaxHeight().background(Palette.FgMostSubtle))
-            Spacer(Modifier.width(10.dp))
+            Box(Modifier.width(3.dp).fillMaxHeight().background(MaterialTheme.colorScheme.outlineVariant))
+            Spacer(Modifier.width(12.dp))
             MarkdownBlocks(block.blocks, style)
         }
         is MdList -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             for (item in block.items) {
                 Row {
                     val marker = when (item.checked) {
-                        true -> "[✓]"
-                        false -> "[ ]"
-                        null -> item.marker
+                        true -> "☑"
+                        false -> "☐"
+                        null -> if (item.marker.firstOrNull()?.isDigit() == true) item.marker else "•"
                     }
-                    Text(marker, style = bodyText, color = if (style.quiet) style.text else Palette.FgMoreSubtle)
+                    Text(marker, style = bodyStyle(style), color = colors.muted)
                     Spacer(Modifier.width(8.dp))
                     MarkdownBlocks(item.blocks, style)
                 }
             }
         }
         is MdTable -> TableView(block, style)
-        MdRule -> Box(Modifier.fillMaxWidth().padding(vertical = 4.dp).height(1.dp).background(Palette.Separator))
-        is MdHtml -> Text(block.text, style = codeText, color = Palette.FgMoreSubtle)
+        MdRule -> HorizontalDivider(Modifier.padding(vertical = 4.dp))
+        is MdHtml -> Text(block.text, style = MaterialTheme.typography.bodyMedium.copy(fontFamily = CodeFont), color = colors.muted)
     }
 }
 
 @Composable
-private fun InlineText(text: String, style: MdStyle, color: Color = style.text, bold: Boolean = false) {
-    val annotated = remember(text, style, color, bold) { inlineAnnotated(text, style, color, bold) }
-    Text(annotated, style = bodyText)
+private fun InlineText(text: String, style: MdStyle, textStyle: TextStyle = bodyStyle(style), modifier: Modifier = Modifier) {
+    val colors = mdColors()
+    val annotated = remember(text, style, colors) { inlineAnnotated(text, style.keepNewlines, colors) }
+    Text(annotated, style = textStyle, modifier = modifier)
 }
 
 @Composable
 private fun HeadingView(block: MdHeading, style: MdStyle) {
-    if (style.quiet) {
-        InlineText(block.text, style, bold = true)
-        return
+    val typography = MaterialTheme.typography
+    val textStyle = when {
+        style.compact -> typography.titleSmall
+        block.level == 1 -> typography.titleLarge
+        block.level == 2 -> typography.titleMedium
+        else -> typography.titleSmall
     }
-    when (block.level) {
-        1 -> {
-            val annotated = remember(block) {
-                inlineAnnotated(block.text, style, Palette.WarningSubtle, bold = true)
-            }
-            Text(annotated, style = bodyText, modifier = Modifier.background(Palette.Primary).padding(horizontal = 6.dp))
-        }
-        6 -> InlineText("###### " + block.text, style, Palette.SuccessMostSubtle)
-        else -> InlineText("#".repeat(block.level) + " " + block.text, style, Palette.Info, bold = true)
-    }
+    InlineText(block.text, style, textStyle, Modifier.semantics { heading() })
 }
 
 @Composable
-private fun CodeBlockView(block: MdCodeBlock, style: MdStyle) {
-    val annotated = remember(block, style) { highlight(block, style) }
+private fun CodeBlockView(block: MdCodeBlock) {
+    val codeColors = LocalCodeColors.current
+    val plain = LocalContentColor.current
+    val annotated = remember(block, codeColors, plain) { highlight(block, codeColors, plain) }
     Box(
         Modifier
             .fillMaxWidth()
-            .background(if (style.quiet) Palette.BgLessVisible.copy(alpha = 0.5f) else Palette.BgLessVisible)
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
             .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
-        Text(annotated, style = codeText, softWrap = false)
+        Text(annotated, style = MaterialTheme.typography.bodyMedium.copy(fontFamily = CodeFont), softWrap = false)
     }
 }
 
@@ -174,13 +193,13 @@ private fun TableView(block: MdTable, style: MdStyle) {
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         for (col in block.header.indices) {
             val align = when (block.aligns[col]) {
-                MdAlign.Start -> androidx.compose.ui.Alignment.Start
-                MdAlign.Center -> androidx.compose.ui.Alignment.CenterHorizontally
-                MdAlign.End -> androidx.compose.ui.Alignment.End
+                MdAlign.Start -> Alignment.Start
+                MdAlign.Center -> Alignment.CenterHorizontally
+                MdAlign.End -> Alignment.End
             }
             Column(horizontalAlignment = align) {
-                InlineText(block.header[col], style, if (style.quiet) style.text else Palette.FgBase, bold = true)
-                Box(Modifier.padding(vertical = 2.dp).width(24.dp).height(1.dp).background(Palette.Separator))
+                InlineText(block.header[col], style, bodyStyle(style).copy(fontWeight = FontWeight.SemiBold))
+                HorizontalDivider(Modifier.padding(vertical = 2.dp).width(24.dp))
                 for (row in block.rows) InlineText(row[col], style)
             }
         }
@@ -191,20 +210,19 @@ private fun safeUrl(url: String) =
     url.startsWith("https://") || url.startsWith("http://") || url.startsWith("mailto:")
 
 /** Builds the styled text of inline markdown. */
-fun inlineAnnotated(text: String, style: MdStyle, color: Color, bold: Boolean = false): AnnotatedString =
+fun inlineAnnotated(text: String, keepNewlines: Boolean, colors: MdColors): AnnotatedString =
     buildAnnotatedString {
-        for (span in parseInline(text, style.keepNewlines)) {
+        for (span in parseInline(text, keepNewlines)) {
             val link = span.url != null
             val spanStyle = SpanStyle(
                 color = when {
-                    style.quiet -> style.text
-                    span.code -> Palette.Destructive
-                    span.image -> Palette.FgMoreSubtle
-                    link -> Palette.SuccessMostSubtle
-                    else -> color
+                    span.image -> colors.muted
+                    link -> colors.link
+                    else -> colors.text
                 },
-                background = if (span.code) Palette.BgLessVisible else Color.Unspecified,
-                fontWeight = if (bold || span.bold || (link && !span.image)) FontWeight.Bold else null,
+                fontFamily = if (span.code) CodeFont else null,
+                background = if (span.code) colors.codeBackground else Color.Unspecified,
+                fontWeight = if (span.bold) FontWeight.Bold else null,
                 fontStyle = if (span.italic) FontStyle.Italic else null,
                 textDecoration = when {
                     span.strike && link -> TextDecoration.combine(listOf(TextDecoration.LineThrough, TextDecoration.Underline))
@@ -213,7 +231,7 @@ fun inlineAnnotated(text: String, style: MdStyle, color: Color, bold: Boolean = 
                     else -> null
                 },
             )
-            val shown = if (span.code) " ${span.text} " else span.text
+            val shown = if (span.code) " ${span.text} " else span.text
             val url = span.url
             if (url != null && safeUrl(url)) {
                 withLink(LinkAnnotation.Url(url, TextLinkStyles(spanStyle))) { append(shown) }
@@ -223,25 +241,20 @@ fun inlineAnnotated(text: String, style: MdStyle, color: Color, bold: Boolean = 
         }
     }
 
-private fun tokenColor(kind: TokenKind): Color = when (kind) {
-    TokenKind.Plain -> Palette.FgSubtle
-    TokenKind.Keyword -> Palette.Info
-    TokenKind.Type -> Palette.Guppy
-    TokenKind.Function -> Palette.SuccessMostSubtle
-    TokenKind.String -> Palette.Cumin
-    TokenKind.Number -> Palette.Success
-    TokenKind.Comment -> Palette.FgMostSubtle
-    TokenKind.Operator -> Palette.Salmon
-    TokenKind.Punctuation -> Palette.WarningSubtle
+private fun tokenColor(kind: TokenKind, colors: CodeColors, plain: Color): Color = when (kind) {
+    TokenKind.Plain, TokenKind.Punctuation -> plain
+    TokenKind.Keyword -> colors.keyword
+    TokenKind.Type -> colors.type
+    TokenKind.Function -> colors.function
+    TokenKind.String -> colors.string
+    TokenKind.Number -> colors.number
+    TokenKind.Comment -> colors.comment
+    TokenKind.Operator -> colors.operator
 }
 
-/** A code block in the palette's syntax colours; the thinking box keeps it muted. */
-private fun highlight(block: MdCodeBlock, style: MdStyle): AnnotatedString = buildAnnotatedString {
-    if (style.quiet) {
-        withStyle(SpanStyle(color = style.text)) { append(block.code) }
-        return@buildAnnotatedString
-    }
+/** A code block in syntax colours. */
+private fun highlight(block: MdCodeBlock, colors: CodeColors, plain: Color): AnnotatedString = buildAnnotatedString {
     for (token in CodeHighlighter.tokenize(block.code, block.language)) {
-        withStyle(SpanStyle(color = tokenColor(token.kind))) { append(token.text) }
+        withStyle(SpanStyle(color = tokenColor(token.kind, colors, plain))) { append(token.text) }
     }
 }

@@ -1,10 +1,15 @@
 package com.casualexplorer.chat.ui
 
+import android.content.ClipData
+import android.content.Intent
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,39 +25,50 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
@@ -62,19 +78,21 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.casualexplorer.chat.R
 import com.casualexplorer.chat.core.AssistantMessage
 import com.casualexplorer.chat.core.CONTEXT_WARN_PERCENT
 import com.casualexplorer.chat.core.ChatState
@@ -84,9 +102,11 @@ import com.casualexplorer.chat.core.UserMessage
 import com.casualexplorer.chat.core.formatEffort
 import com.casualexplorer.chat.core.formatTokens
 import com.casualexplorer.chat.core.modelChoices
-
-private val body = TextStyle(fontFamily = Mono, fontSize = 14.sp, lineHeight = 20.sp)
-private val small = TextStyle(fontFamily = Mono, fontSize = 12.sp, lineHeight = 16.sp)
+import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 
 /** The chat screen, connected to [vm]. */
 @Composable
@@ -98,6 +118,7 @@ fun ChatRoute(vm: ChatViewModel, onOpenSettings: () -> Unit) {
         onInputChange = vm::onDraftChange,
         onSend = vm::send,
         onStop = vm::stop,
+        onRetry = vm::retry,
         onHistoryPrevious = vm::historyPrevious,
         onHistoryNext = vm::historyNext,
         onHistoryEscape = vm::historyEscape,
@@ -111,7 +132,7 @@ fun ChatRoute(vm: ChatViewModel, onOpenSettings: () -> Unit) {
 }
 
 /**
- * The conversation: the model bar on top, the messages, and the input.
+ * The conversation: the model in the top bar, the messages, and the input.
  * The history callbacks return whether there was a message to show.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -122,6 +143,7 @@ fun ChatScreen(
     onInputChange: (TextFieldValue) -> Unit,
     onSend: () -> Unit,
     onStop: () -> Unit,
+    onRetry: () -> Unit,
     onHistoryPrevious: () -> Boolean,
     onHistoryNext: () -> Boolean,
     onHistoryEscape: () -> Boolean,
@@ -131,13 +153,30 @@ fun ChatScreen(
     onToggleThinking: (replyId: Long) -> Unit,
     onUserMessageShown: () -> Unit,
     onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val state = uiState.chat
     val snackbar = remember { SnackbarHostState() }
     var showModels by rememberSaveable { mutableStateOf(false) }
-    var showEffort by rememberSaveable { mutableStateOf(false) }
-    @Suppress("DEPRECATION")
-    val clipboard = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val copied = stringResource(R.string.copied)
+    val actions = remember(clipboard, context, scope, copied) {
+        MessageActions(
+            onCopy = { text ->
+                scope.launch {
+                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(null, text)))
+                    // Android 13 and later confirm a copy themselves.
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) snackbar.showSnackbar(copied)
+                }
+            },
+            onShare = { text ->
+                val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
+                context.startActivity(Intent.createChooser(send, null))
+            },
+        )
+    }
 
     uiState.userMessage?.let { message ->
         LaunchedEffect(message) {
@@ -147,15 +186,19 @@ fun ChatScreen(
     }
 
     Scaffold(
-        containerColor = Palette.BgBase,
+        modifier = modifier,
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
-            ModelBar(
-                state,
-                onModel = { showModels = true },
-                onEffort = { showEffort = true },
-                onNewChat = onNewChat,
-                onSettings = onOpenSettings,
+            TopAppBar(
+                title = { ModelTitle(state, onClick = { showModels = true }) },
+                actions = {
+                    IconButton(onClick = onNewChat) {
+                        Icon(Icons.Filled.Create, contentDescription = stringResource(R.string.new_chat))
+                    }
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.settings))
+                    }
+                },
             )
         },
     ) { padding ->
@@ -172,13 +215,13 @@ fun ChatScreen(
                 } else {
                     MessageList(
                         state,
-                        expanded = { it in uiState.expandedThinking },
-                        onToggle = onToggleThinking,
-                        onCopy = { clipboard.setText(AnnotatedString(it)) },
+                        expanded = uiState.expandedThinking,
+                        onToggleThinking = onToggleThinking,
+                        actions = actions,
+                        onRetry = onRetry,
                     )
                 }
             }
-            HorizontalDivider(color = Palette.Separator)
             InputBar(
                 streaming = state.streaming,
                 input = input,
@@ -195,168 +238,56 @@ fun ChatScreen(
     if (showModels) {
         ModelSheet(
             state,
-            onSelect = {
+            onSelectModel = {
                 onSelectModel(it.provider, it.model)
                 showModels = false
             },
+            onSelectEffort = onSelectEffort,
             onDismiss = { showModels = false },
         )
     }
-    if (showEffort) {
-        EffortSheet(
-            state,
-            onSelect = {
-                onSelectEffort(it)
-                showEffort = false
-            },
-            onDismiss = { showEffort = false },
-        )
-    }
 }
 
 /**
- * "◇ model via Provider" over the reasoning effort and context use. Tapping
- * the model opens the model picker; tapping the effort opens its selector.
+ * The model, with the provider, the reasoning effort sent and how full the
+ * context window is under it. Tapping it opens the model sheet.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ModelBar(
-    state: ChatState,
-    onModel: () -> Unit,
-    onEffort: () -> Unit,
-    onNewChat: () -> Unit,
-    onSettings: () -> Unit,
-) {
+private fun ModelTitle(state: ChatState, onClick: () -> Unit) {
     val active = state.active
-    Column {
-        TopAppBar(
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = Palette.BgBase),
-            title = {
-                Column {
-                    Text(
-                        buildAnnotatedString {
-                            withStyle(SpanStyle(color = Palette.FgMostSubtle)) { append("$MODEL_ICON ") }
-                            withStyle(SpanStyle(color = Palette.FgBase)) { append(state.models.getOrElse(active) { "" }) }
-                            withStyle(SpanStyle(color = Palette.FgMoreSubtle)) { append(" via ${state.providerNames.getOrElse(active) { "" }}") }
-                        },
-                        style = body,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.clickable(onClickLabel = "Switch model") { onModel() },
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            "Reasoning " + formatEffort(state.requestEfforts.getOrElse(active) { "" }),
-                            style = small,
-                            color = Palette.FgMostSubtle,
-                            modifier = Modifier.clickable(onClickLabel = "Change reasoning effort") { onEffort() },
-                        )
-                        contextUsage(state)?.let {
-                            Text("  ·  ", style = small, color = Palette.FgMostSubtle)
-                            Text(it, style = small)
-                        }
-                    }
-                }
-            },
-            actions = {
-                IconButton(onClick = onNewChat) {
-                    Icon(Icons.Filled.Add, contentDescription = "New chat", tint = Palette.FgMoreSubtle)
-                }
-                IconButton(onClick = onSettings) {
-                    Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = Palette.FgMoreSubtle)
-                }
-            },
-        )
-        HorizontalDivider(color = Palette.Separator)
-    }
-}
-
-/**
- * How much of the context window the conversation fills, as Crush shows it:
- * "12% (24.5K)", with a warning sign past 80%. Without a known window
- * (OpenAI doesn't report one) it is just the token count.
- */
-private fun contextUsage(state: ChatState): AnnotatedString? {
-    val usage = state.usage ?: return null
-    val tokens = formatTokens(usage.context)
-    val pct = state.contextPercent
-    return buildAnnotatedString {
-        if (pct < 0) {
-            withStyle(SpanStyle(color = Palette.FgMostSubtle)) { append("$tokens tokens") }
-            return@buildAnnotatedString
-        }
-        if (pct > CONTEXT_WARN_PERCENT) withStyle(SpanStyle(color = Palette.Warning)) { append("⚠ ") }
-        withStyle(SpanStyle(color = Palette.FgMoreSubtle)) { append("$pct%") }
-        withStyle(SpanStyle(color = Palette.FgMostSubtle)) { append(" ($tokens)") }
-    }
-}
-
-@Composable
-private fun EmptyState(state: ChatState, hasKey: Boolean, onOpenSettings: () -> Unit) {
     Column(
-        Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
+        Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClickLabel = stringResource(R.string.switch_model), role = Role.Button, onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
     ) {
-        Text(
-            "chat",
-            style = TextStyle(
-                fontFamily = Mono,
-                fontSize = 44.sp,
-                fontWeight = FontWeight.Bold,
-                brush = Brush.linearGradient(listOf(Palette.Primary, Palette.Secondary)),
-            ),
-        )
-        Spacer(Modifier.height(12.dp))
-        Text(
-            "$MODEL_ICON ${state.models.getOrElse(state.active) { "" }} via ${state.providerNames.getOrElse(state.active) { "" }}",
-            style = small,
-            color = Palette.FgMoreSubtle,
-        )
-        Spacer(Modifier.height(24.dp))
-        if (hasKey) {
-            Text("Type a message below to start.", style = body, color = Palette.FgMostSubtle)
-        } else {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "Add your ${state.providerNames.getOrElse(state.active) { "" }} API key to start.",
-                style = body,
-                color = Palette.FgMostSubtle,
+                state.models.getOrElse(active) { "" },
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
             )
-            Spacer(Modifier.height(12.dp))
-            OutlinedButton(onClick = onOpenSettings) { Text("Open Settings", style = body, color = Palette.FgBase) }
+            Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
         }
-    }
-}
-
-@Composable
-private fun MessageList(
-    state: ChatState,
-    expanded: (Long) -> Boolean,
-    onToggle: (Long) -> Unit,
-    onCopy: (String) -> Unit,
-) {
-    val listState = rememberLazyListState()
-    // Newest first in a reversed list: the list stays anchored to the bottom
-    // while a reply grows, unless the reader has scrolled up.
-    val messages = state.messages.asReversed()
-    LaunchedEffect(state.messages.size) {
-        if (state.messages.isNotEmpty()) listState.animateScrollToItem(0)
-    }
-    LazyColumn(
-        state = listState,
-        reverseLayout = true,
-        contentPadding = PaddingValues(vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        items(messages, key = { it.id }) { message ->
-            when (message) {
-                is UserMessage -> UserMessageView(message)
-                is AssistantMessage -> AssistantMessageView(
-                    message,
-                    expanded = expanded(message.id),
-                    onToggleThinking = { onToggle(message.id) },
-                    onCopy = { onCopy(message.text) },
+        Row {
+            Text(
+                stringResource(
+                    R.string.model_subtitle,
+                    state.providerNames.getOrElse(active) { "" },
+                    formatEffort(state.requestEfforts.getOrElse(active) { "" }),
+                ),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+            contextUsage(state)?.let { (text, warn) ->
+                Text(
+                    " · $text",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (warn) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
                 )
             }
         }
@@ -364,7 +295,137 @@ private fun MessageList(
 }
 
 /**
- * The input, behind Crush's ":::" prompt, with Send (or Stop while a reply
+ * How much of the context window the last reply filled, "12% of context",
+ * and whether that is past the warning level. Without a known window
+ * (OpenAI doesn't report one) it is just the token count.
+ */
+@Composable
+private fun contextUsage(state: ChatState): Pair<String, Boolean>? {
+    val usage = state.usage ?: return null
+    val pct = state.contextPercent
+    if (pct < 0) return stringResource(R.string.context_tokens, formatTokens(usage.context)) to false
+    return stringResource(R.string.context_percent, pct) to (pct > CONTEXT_WARN_PERCENT)
+}
+
+@Composable
+private fun EmptyState(state: ChatState, hasKey: Boolean, onOpenSettings: () -> Unit) {
+    val provider = state.providerNames.getOrElse(state.active) { "" }
+    Column(
+        Modifier.fillMaxSize().padding(32.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(stringResource(R.string.empty_title), style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            stringResource(R.string.empty_model, state.models.getOrElse(state.active) { "" }, provider),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        if (!hasKey) {
+            Spacer(Modifier.height(24.dp))
+            Text(
+                stringResource(R.string.empty_no_key, provider),
+                style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(16.dp))
+            FilledTonalButton(onClick = onOpenSettings) { Text(stringResource(R.string.open_settings)) }
+        }
+    }
+}
+
+/**
+ * The messages, newest at the bottom: a reversed list stays anchored to the
+ * newest while a reply grows, unless the reader has scrolled up, when a
+ * button jumps back down.
+ */
+@Composable
+private fun MessageList(
+    state: ChatState,
+    expanded: Set<Long>,
+    onToggleThinking: (Long) -> Unit,
+    actions: MessageActions,
+    onRetry: () -> Unit,
+) {
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val zone = remember { ZoneId.systemDefault() }
+    val items = remember(state.messages, zone) { chatItems(state.messages, zone).asReversed() }
+    // Only the last reply can be retried, once it has ended without completing.
+    val retryable = (state.messages.lastOrNull() as? AssistantMessage)?.takeIf { it.failed && !state.streaming }?.id
+    LaunchedEffect(state.messages.size) {
+        if (state.messages.isNotEmpty()) listState.animateScrollToItem(0)
+    }
+    val showJump by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
+
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            reverseLayout = true,
+            contentPadding = PaddingValues(vertical = 16.dp),
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            items(
+                items,
+                key = { it.key },
+                contentType = {
+                    when (it) {
+                        is ChatItem.DateHeader -> 0
+                        is ChatItem.Message -> if (it.message is UserMessage) 1 else 2
+                    }
+                },
+            ) { item ->
+                when (item) {
+                    is ChatItem.DateHeader -> DateHeader(item.day, zone)
+                    is ChatItem.Message -> Box(Modifier.padding(top = if (item.firstInGroup) 16.dp else 4.dp)) {
+                        when (val message = item.message) {
+                            is UserMessage -> UserMessageView(item, message, actions)
+                            is AssistantMessage -> AssistantMessageView(
+                                item,
+                                message,
+                                expanded = message.id in expanded,
+                                onToggleThinking = { onToggleThinking(message.id) },
+                                actions = actions,
+                                onRetry = if (message.id == retryable) onRetry else null,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        if (showJump) {
+            SmallFloatingActionButton(
+                onClick = { scope.launch { listState.animateScrollToItem(0) } },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+            ) {
+                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = stringResource(R.string.jump_to_newest))
+            }
+        }
+    }
+}
+
+/** "Today", "Yesterday", or the date. */
+@Composable
+private fun DateHeader(day: LocalDate, zone: ZoneId) {
+    val today = LocalDate.now(zone)
+    val label = when (day) {
+        today -> stringResource(R.string.today)
+        today.minusDays(1) -> stringResource(R.string.yesterday)
+        else -> DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).format(day)
+    }
+    Text(
+        label,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 8.dp).semantics { heading() },
+    )
+}
+
+/**
+ * The input, which grows to a few lines, with Send (or Stop while a reply
  * streams). With a hardware keyboard, Enter sends (Shift+Enter is a new
  * line), Up and Down at the ends of the text step through the messages sent
  * this session, and Esc goes back to the draft.
@@ -380,8 +441,6 @@ private fun InputBar(
     onHistoryNext: () -> Boolean,
     onHistoryEscape: () -> Boolean,
 ) {
-    var focused by remember { mutableStateOf(false) }
-
     fun onKey(event: KeyEvent): Boolean {
         if (event.type != KeyEventType.KeyDown) return false
         val hardware = event.nativeKeyEvent.device?.isVirtual == false
@@ -400,77 +459,92 @@ private fun InputBar(
         }
     }
 
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .background(Palette.BgBase)
-            .padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            if (focused) " > " else ":::",
-            style = body.copy(fontWeight = FontWeight.Bold),
-            color = if (focused) Palette.Success else Palette.FgMoreSubtle,
-        )
-        Spacer(Modifier.width(8.dp))
-        BasicTextField(
-            value = input,
-            onValueChange = onInputChange,
-            textStyle = body.copy(color = Palette.FgBase),
-            cursorBrush = SolidColor(Palette.Secondary),
-            maxLines = 8,
-            modifier = Modifier
-                .weight(1f)
-                .padding(vertical = 10.dp)
-                .onFocusChanged { focused = it.isFocused }
-                .onPreviewKeyEvent(::onKey),
-            decorationBox = { inner ->
-                Box {
-                    if (input.text.isEmpty()) {
-                        Text("Ready…", style = body, color = Palette.FgMostSubtle)
+    Surface(color = MaterialTheme.colorScheme.surface) {
+        Row(
+            Modifier.fillMaxWidth().padding(start = 12.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            TextField(
+                value = input,
+                onValueChange = onInputChange,
+                placeholder = { Text(stringResource(R.string.message_placeholder)) },
+                shape = RoundedCornerShape(28.dp),
+                colors = TextFieldDefaults.colors(
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    disabledIndicatorColor = Color.Transparent,
+                ),
+                maxLines = 6,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                modifier = Modifier.weight(1f).heightIn(min = 56.dp).onPreviewKeyEvent(::onKey),
+            )
+            Spacer(Modifier.width(8.dp))
+            Box(Modifier.height(56.dp), contentAlignment = Alignment.Center) {
+                if (streaming) {
+                    val stop = stringResource(R.string.stop)
+                    FilledTonalIconButton(onClick = onStop, modifier = Modifier.semantics { contentDescription = stop }) {
+                        Box(Modifier.size(14.dp).clip(RoundedCornerShape(2.dp)).background(LocalContentColor.current))
                     }
-                    inner()
+                } else {
+                    FilledIconButton(onClick = onSend, enabled = input.text.isNotBlank()) {
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.send))
+                    }
                 }
-            },
-        )
-        if (streaming) {
-            IconButton(onClick = onStop) {
-                Icon(Icons.Filled.Close, contentDescription = "Stop the reply", tint = Palette.Destructive)
-            }
-        } else {
-            IconButton(onClick = onSend, enabled = input.text.isNotBlank()) {
-                Icon(
-                    Icons.AutoMirrored.Filled.Send,
-                    contentDescription = "Send",
-                    tint = if (input.text.isNotBlank()) Palette.Primary else Palette.FgMostSubtle,
-                    modifier = Modifier.size(22.dp),
-                )
             }
         }
     }
 }
 
 /**
- * Switches model or provider; the conversation carries over. It lists each
- * provider's current model, then the models it serves, and a filter that
- * matches nothing can be used as a model ID as it is.
+ * The model and its reasoning effort. The effort chips set the active
+ * provider's effort (each provider keeps its own); the list switches model
+ * or provider, and the conversation carries over. A filter that matches no
+ * model can be used as a model ID as it is.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun ModelSheet(state: ChatState, onSelect: (ModelChoice) -> Unit, onDismiss: () -> Unit) {
+private fun ModelSheet(
+    state: ChatState,
+    onSelectModel: (ModelChoice) -> Unit,
+    onSelectEffort: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val active = state.active
+    val provider = state.providerNames.getOrElse(active) { "" }
+    val chosen = state.efforts.getOrElse(active) { "" }
+    val sent = state.requestEfforts.getOrElse(active) { chosen }
     var filter by rememberSaveable { mutableStateOf("") }
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Palette.BgLeastVisible) {
-        Text("Switch Model", style = body, color = Palette.Primary, modifier = Modifier.padding(horizontal = 20.dp))
-        Spacer(Modifier.height(8.dp))
-        OutlinedTextField(
-            value = filter,
-            onValueChange = { filter = it },
-            singleLine = true,
-            textStyle = body,
-            placeholder = { Text("Filter or type a model ID", style = body, color = Palette.FgMostSubtle) },
-            colors = sheetFieldColors(),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        )
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.padding(horizontal = 24.dp)) {
+            Text(stringResource(R.string.model_sheet_title), style = MaterialTheme.typography.titleLarge)
+            Spacer(Modifier.height(16.dp))
+            Text(stringResource(R.string.reasoning_effort, provider), style = MaterialTheme.typography.titleSmall)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for (effort in EFFORTS) {
+                    FilterChip(
+                        selected = effort == chosen,
+                        onClick = { onSelectEffort(effort) },
+                        label = { Text(formatEffort(effort)) },
+                    )
+                }
+            }
+            if (sent != chosen) {
+                Text(
+                    stringResource(R.string.effort_lowered, state.models.getOrElse(active) { "" }, formatEffort(chosen), formatEffort(sent)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+            OutlinedTextField(
+                value = filter,
+                onValueChange = { filter = it },
+                singleLine = true,
+                placeholder = { Text(stringResource(R.string.filter_models)) },
+                keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
         val query = filter.trim()
         val choices = state.modelChoices().filter { query.isEmpty() || it.model.contains(query, ignoreCase = true) }
         val custom = if (query.isNotEmpty() && choices.none { it.model == query }) {
@@ -478,80 +552,24 @@ private fun ModelSheet(state: ChatState, onSelect: (ModelChoice) -> Unit, onDism
         } else {
             emptyList()
         }
-        LazyColumn(Modifier.heightIn(max = 480.dp).padding(top = 8.dp, bottom = 24.dp)) {
-            items(choices + custom) { choice ->
-                val provider = state.providerNames[choice.provider]
-                val info = when {
-                    choice.current -> "current · $provider"
-                    choice in custom -> "use with $provider"
-                    else -> provider
-                }
-                SheetRow(choice.model, info, selected = choice.current) { onSelect(choice) }
+        LazyColumn(Modifier.heightIn(max = 480.dp).padding(top = 8.dp, bottom = 16.dp)) {
+            items(choices + custom, key = { "${it.provider}/${it.model}/${it in custom}" }) { choice ->
+                val name = state.providerNames[choice.provider]
+                ListItem(
+                    headlineContent = { Text(choice.model) },
+                    supportingContent = {
+                        Text(
+                            when {
+                                choice.current -> stringResource(R.string.current_model, name)
+                                choice in custom -> stringResource(R.string.use_with, name)
+                                else -> name
+                            },
+                        )
+                    },
+                    trailingContent = { RadioButton(selected = choice.current, onClick = null) },
+                    modifier = Modifier.selectable(selected = choice.current, role = Role.RadioButton) { onSelectModel(choice) },
+                )
             }
         }
     }
 }
-
-/** Sets the active provider's reasoning effort; each provider keeps its own. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun EffortSheet(state: ChatState, onSelect: (String) -> Unit, onDismiss: () -> Unit) {
-    val active = state.active
-    val chosen = state.efforts.getOrElse(active) { "" }
-    val sent = state.requestEfforts.getOrElse(active) { chosen }
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Palette.BgLeastVisible) {
-        Text(
-            "Reasoning Effort · ${state.providerNames.getOrElse(active) { "" }}",
-            style = body,
-            color = Palette.Primary,
-            modifier = Modifier.padding(horizontal = 20.dp),
-        )
-        if (sent != chosen) {
-            Text(
-                "${state.models[active]} doesn't support ${formatEffort(chosen)}; requests use ${formatEffort(sent)}.",
-                style = small,
-                color = Palette.FgMoreSubtle,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-            )
-        }
-        Column(Modifier.padding(top = 8.dp, bottom = 24.dp)) {
-            for (effort in EFFORTS) {
-                SheetRow(formatEffort(effort), if (effort == chosen) "current" else "", selected = effort == chosen) { onSelect(effort) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SheetRow(title: String, info: String, selected: Boolean, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .background(if (selected) Palette.Primary else Color.Transparent)
-            .padding(horizontal = 20.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            title,
-            style = body,
-            color = if (selected) Palette.OnPrimary else Palette.FgBase,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        if (info.isNotEmpty()) {
-            Spacer(Modifier.width(12.dp))
-            Text(info, style = small, color = if (selected) Palette.OnPrimary else Palette.FgMostSubtle)
-        }
-    }
-}
-
-@Composable
-fun sheetFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedBorderColor = Palette.Primary,
-    unfocusedBorderColor = Palette.BgMostVisible,
-    focusedTextColor = Palette.FgBase,
-    unfocusedTextColor = Palette.FgBase,
-    cursorColor = Palette.Secondary,
-)

@@ -27,7 +27,12 @@ sealed interface ChatMessage {
     val id: Long
 }
 
-data class UserMessage(override val id: Long, val text: String) : ChatMessage
+data class UserMessage(
+    override val id: Long,
+    val text: String,
+    /** When it was sent. */
+    val createdAt: Long = 0,
+) : ChatMessage
 
 /**
  * A reply: the reasoning summary, the reply, any note, and a footer naming the

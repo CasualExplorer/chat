@@ -180,6 +180,23 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun retrySendsTheFailedMessageAgainAndTakesItOutOfTheInput() = runTest(main.dispatcher) {
+        val p = ScriptedProvider(listOf(StreamEvent.Failed(StreamError("Boom"))))
+        val vm = backgroundScope.viewModel(p)
+        vm.type("try me")
+        vm.send()
+        vm.uiState.first { !it.chat.streaming && it.chat.messages.size == 2 }
+        assertEquals("the message came back to the input", "try me", vm.draft.text)
+
+        p.script = listOf(StreamEvent.Done(Turn(Role.Assistant, "Done")))
+        vm.retry()
+        assertEquals("", vm.draft.text)
+        assertEquals("Done", vm.awaitReply(4).text)
+        val user = vm.uiState.value.chat.messages[2] as com.casualexplorer.chat.core.UserMessage
+        assertEquals("try me", user.text)
+    }
+
+    @Test
     fun thinkingExpandsAndCollapses() = runTest(main.dispatcher) {
         val vm = backgroundScope.viewModel(ScriptedProvider())
         vm.toggleThinking(7)

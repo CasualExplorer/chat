@@ -2,14 +2,10 @@ package com.casualexplorer.chat.ui
 
 import android.app.Application
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.test.DeviceConfigurationOverride
+import androidx.compose.ui.test.FontScale
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.text.input.TextFieldValue
-import com.casualexplorer.chat.core.AssistantMessage
-import com.casualexplorer.chat.core.ChatState
-import com.casualexplorer.chat.core.Usage
-import com.casualexplorer.chat.core.UserMessage
-import com.casualexplorer.chat.data.UserSettings
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
 import org.junit.Test
@@ -18,7 +14,11 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** Screenshots of whole screens, from state alone; the references live in `src/test/screenshots`. */
+/**
+ * Screenshots of whole screens, from sample state, in light and dark and at
+ * twice the font size. Dynamic colour is off, so they don't depend on a
+ * wallpaper. The references live in `src/test/screenshots`.
+ */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w411dp-h891dp-xxhdpi", application = Application::class)
@@ -26,74 +26,38 @@ class ScreensScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    private val chat = ChatState(
-        active = 1,
-        providerNames = listOf("Anthropic", "OpenAI"),
-        models = listOf("claude-sonnet-5-5", "gpt-5.6-luna"),
-        efforts = listOf("medium", "high"),
-        requestEfforts = listOf("medium", "high"),
-        catalogs = listOf(emptyList(), emptyList()),
-    )
-
-    private fun capture(name: String, content: @Composable () -> Unit) {
-        composeRule.setContent { ChatTheme(content) }
+    private fun capture(name: String, dark: Boolean = false, fontScale: Float = 1f, content: @Composable () -> Unit) {
+        composeRule.setContent {
+            DeviceConfigurationOverride(DeviceConfigurationOverride.FontScale(fontScale)) {
+                ChatTheme(darkTheme = dark, dynamicColor = false, content = content)
+            }
+        }
         composeRule.onRoot().captureRoboImage("src/test/screenshots/$name.png")
     }
 
-    @Composable
-    private fun Chat(uiState: ChatUiState, input: String = "") = ChatScreen(
-        uiState = uiState,
-        input = TextFieldValue(input),
-        onInputChange = {},
-        onSend = {},
-        onStop = {},
-        onHistoryPrevious = { false },
-        onHistoryNext = { false },
-        onHistoryEscape = { false },
-        onSelectModel = { _, _ -> },
-        onSelectEffort = {},
-        onNewChat = {},
-        onToggleThinking = {},
-        onUserMessageShown = {},
-        onOpenSettings = {},
-    )
-
     @Test
-    fun chatWithAConversation() = capture("chat_conversation") {
-        Chat(
-            ChatUiState(
-                chat = chat.copy(
-                    messages = listOf(
-                        UserMessage(1, "What is the capital of France?"),
-                        AssistantMessage(
-                            id = 2,
-                            provider = "OpenAI",
-                            model = "gpt-5.6-luna",
-                            text = "**Paris.** It has been the capital since 987.",
-                            usage = Usage(input = 900, output = 40, context = 940),
-                            pending = false,
-                            elapsedMs = 1_800,
-                        ),
-                    ),
-                    usage = Usage(input = 900, output = 40, context = 940),
-                ),
-                hasKey = true,
-            ),
-            input = "And of Italy?",
-        )
+    fun conversation() = capture("chat_conversation") {
+        ChatScreenSample(SampleData.conversation, input = "And in Rust?")
     }
 
     @Test
-    fun chatWithoutAKey() = capture("chat_empty_no_key") {
-        Chat(ChatUiState(chat = chat, hasKey = false))
+    fun conversationDark() = capture("chat_conversation_dark", dark = true) {
+        ChatScreenSample(SampleData.conversation, input = "And in Rust?")
     }
 
     @Test
-    fun settings() = capture("settings") {
-        SettingsScreen(
-            UserSettings(openaiKey = "sk-test", anthropicBaseUrl = "https://gateway.example/anthropic"),
-            onSave = {},
-            onBack = {},
-        )
+    fun conversationLargeFont() = capture("chat_conversation_font_2x", fontScale = 2f) {
+        ChatScreenSample(SampleData.conversation)
+    }
+
+    @Test
+    fun noKey() = capture("chat_empty_no_key") { ChatScreenSample(SampleData.noKey) }
+
+    @Test
+    fun settings() = capture("settings") { SettingsScreen(SampleData.settings, onSave = {}, onBack = {}) }
+
+    @Test
+    fun settingsDark() = capture("settings_dark", dark = true) {
+        SettingsScreen(SampleData.settings, onSave = {}, onBack = {})
     }
 }

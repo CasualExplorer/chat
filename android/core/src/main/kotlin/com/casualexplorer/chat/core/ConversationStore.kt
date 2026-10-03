@@ -101,7 +101,7 @@ class InMemoryConversationStore : ConversationStore {
 
 /** The message as the chat shows it. */
 fun MessageRecord.toChatMessage(): ChatMessage = when (role) {
-    Role.User -> UserMessage(id, text)
+    Role.User -> UserMessage(id, text, createdAt)
     Role.Assistant -> AssistantMessage(
         id = id,
         provider = provider,
