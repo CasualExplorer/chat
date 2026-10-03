@@ -6,6 +6,7 @@
     <!-- Backups are off: the API keys are encrypted with a key that stays in
          this device's keystore, so a restored copy couldn't be read anyway. -->
     <application
+        android:name=".ChatApplication"
         android:allowBackup="false"
         android:fullBackupContent="false"
         android:dataExtractionRules="@xml/data_extraction_rules"

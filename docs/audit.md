@@ -8,8 +8,8 @@ Reviewed against:
 - the CLAUDE.md requirements,
 - `docs/behavior.md`.
 
-**Status: waiting for approval.** Nothing in `android/` has been changed.
-Section 5 lists the decisions I need from you before step 3a.
+**Status: approved 2026-10-03.** All eight proposals in section 5 were
+accepted as written. The refactor follows section 6.
 
 ---
 
@@ -127,7 +127,7 @@ Section 4 maps each of those requirements to what it can mean here.
 | Notifications with a reply action when backgrounded | No incoming messages exist. The useful case is a reply that finishes or fails while the app is in the background. | A "Replies" notification channel. On completion or failure while backgrounded, post a notification with the reply preview and a **Reply** action (`RemoteInput`), which sends a follow-up through the repository. Request `POST_NOTIFICATIONS` at a contextual moment (the first send), with a rationale. |
 | WorkManager or foreground service only if needed | A reasoning reply can run for minutes. Android may kill a backgrounded process. | **Needs approval:** (a) accept that the reply may be lost if the process dies (it is marked "Interrupted" in Room on next launch), or (b) run a foreground service while a reply streams and the app is backgrounded. Its type would be `dataSync` or `shortService`; the right type needs checking against current FGS policy before step 3e. |
 
-## 5. Decisions needed before step 3a
+## 5. Decisions (all approved as proposed, 2026-10-03)
 
 1. **Persist conversations in Room?** CLAUDE.md requires it, but the Go app
    deliberately keeps nothing on disk.

@@ -4,15 +4,18 @@ A native Android port of the terminal chat client in the repository root, for th
 
 ## Build
 
-JDK 17+ and the Android SDK (API 35):
+JDK 17+ and the Android SDK (compiles against API 37, targets API 36). The build uses Gradle 9.8, AGP 9.4 with its built-in Kotlin, Hilt and a version catalog (`gradle/libs.versions.toml`).
 
 ```sh
 cd android
-./gradlew :core:test            # unit tests (plain JVM, no emulator)
-./gradlew :app:assembleDebug    # app/build/outputs/apk/debug/app-debug.apk
+./gradlew lint                    # Android lint
+./gradlew test                    # unit tests: core/ on the JVM, app/ on Robolectric
+./gradlew verifyRoborazziDebug    # screenshot tests against app/src/test/screenshots
+./gradlew recordRoborazziDebug    # re-record those references
+./gradlew assembleDebug           # app/build/outputs/apk/debug/app-debug.apk
 ```
 
-CI (`.github/workflows/android.yml`) runs both and uploads the debug APK as the `chat-debug-apk` artifact.
+CI (`.github/workflows/android.yml`) runs lint, the screenshot tests, the unit tests and the debug build. It uploads the APK (`chat-debug-apk`), the screenshots (`screenshots`) and the lint and test reports (`reports`). When there are no reference screenshots yet, or a manual run sets `record_screenshots`, CI records them and commits them to the branch instead of verifying them.
 
 ## Setup
 

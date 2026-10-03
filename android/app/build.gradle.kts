@@ -1,19 +1,20 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.hilt)
+    alias(libs.plugins.roborazzi)
 }
 
 android {
     namespace = "com.casualexplorer.chat"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.casualexplorer.chat"
         minSdk = 26
-        targetSdk = 35
+        // Google Play requires API 36 for new apps and updates from 2026-08-31.
+        targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
     }
@@ -24,6 +25,7 @@ android {
         }
     }
 
+    // Built-in Kotlin takes its jvmTarget from targetCompatibility.
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -32,10 +34,15 @@ android {
     buildFeatures {
         compose = true
     }
-}
 
-kotlin {
-    compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
+    testOptions {
+        // Robolectric and the screenshot tests need the app's resources.
+        unitTests.isIncludeAndroidResources = true
+    }
+
+    lint {
+        abortOnError = true
+    }
 }
 
 dependencies {
@@ -50,4 +57,16 @@ dependencies {
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.security.crypto)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
+    ksp(libs.kotlin.metadata)
+
+    // createComposeRule's activity, for the debug-only screenshot tests.
+    debugImplementation(libs.compose.ui.test.manifest)
+
+    testImplementation(platform(libs.compose.bom))
+    testImplementation(libs.compose.ui.test.junit4)
+    testImplementation(libs.junit4)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.roborazzi)
 }
