@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -383,7 +384,12 @@ private fun ErrorRow(reason: String, onRetry: (() -> Unit)?) {
                 }
             }
             if (onRetry != null) {
-                TextButton(onClick = onRetry, modifier = Modifier.align(Alignment.End)) { Text(stringResource(R.string.retry)) }
+                // In the card's own colour: the primary colour reads poorly on errorContainer.
+                TextButton(
+                    onClick = onRetry,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onErrorContainer),
+                    modifier = Modifier.align(Alignment.End),
+                ) { Text(stringResource(R.string.retry)) }
             }
         }
     }
