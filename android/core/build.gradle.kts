@@ -25,4 +25,9 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    // Full stack traces in the CI log, where the reports can't be read.
+    testLogging {
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        showStackTraces = true
+    }
 }

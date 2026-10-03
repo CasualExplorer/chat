@@ -38,6 +38,16 @@ android {
     testOptions {
         // Robolectric and the screenshot tests need the app's resources.
         unitTests.isIncludeAndroidResources = true
+        unitTests.all { test ->
+            // Robolectric's FileDescriptor interceptor reaches into
+            // jdk.internal.access, which Java 21 doesn't export by default.
+            test.jvmArgs("--add-exports=java.base/jdk.internal.access=ALL-UNNAMED")
+            // Full stack traces in the CI log, where the reports can't be read.
+            test.testLogging {
+                exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+                showStackTraces = true
+            }
+        }
     }
 
     lint {
