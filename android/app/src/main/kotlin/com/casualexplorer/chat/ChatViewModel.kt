@@ -1,37 +1,50 @@
 package com.casualexplorer.chat
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.casualexplorer.chat.core.ANTHROPIC_BASE_URL
 import com.casualexplorer.chat.core.AnthropicProvider
 import com.casualexplorer.chat.core.ChatSession
 import com.casualexplorer.chat.core.ChatState
+import com.casualexplorer.chat.core.OPENAI_BASE_URL
 import com.casualexplorer.chat.core.OpenAIProvider
 import com.casualexplorer.chat.core.PromptHistory
+import com.casualexplorer.chat.data.SettingsRepository
+import com.casualexplorer.chat.data.UserSettings
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /**
- * Holds the conversation for the life of the app's task. Nothing is written
- * to disk: the conversation is lost when the process ends, as in the
- * terminal app.
+ * Holds the conversation for the life of the app's task. The providers take
+ * their keys and servers from the settings as they change; the start
+ * provider, models and efforts are applied once, when the settings first
+ * load, as the terminal app applies its flags.
  */
-class ChatViewModel(app: Application) : AndroidViewModel(app) {
-    val settings = Settings(app)
+@HiltViewModel
+class ChatViewModel @Inject constructor(
+    private val settingsRepository: SettingsRepository,
+) : ViewModel() {
+    /** The latest settings, which the providers read their keys from on each request. */
+    @Volatile
+    private var current = UserSettings()
 
-    private val providers = listOf(
-        AnthropicProvider(settings.anthropicModel, settings.anthropicEffort, { settings.anthropicKey }),
-        OpenAIProvider(settings.openaiModel, settings.openaiEffort, { settings.openaiKey }),
-    )
+    private val anthropic = AnthropicProvider(current.anthropicModel, current.anthropicEffort, { current.anthropicKey })
+    private val openai = OpenAIProvider(current.openaiModel, current.openaiEffort, { current.openaiKey })
+    private val providers = listOf(anthropic, openai)
 
-    private val session = ChatSession(
-        providers,
-        if (settings.startProvider == "anthropic") 0 else 1,
-        viewModelScope,
-    )
+    private val session = ChatSession(providers, current.startIndex, viewModelScope)
 
     val state: StateFlow<ChatState> = session.state
+
+    /** The saved settings, or null until they have loaded. */
+    val settings: StateFlow<UserSettings?> =
+        settingsRepository.settings.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** A message that failed before any reply text, to put back in an empty input. */
     val restoredInput: SharedFlow<String> = session.restoredInput
@@ -44,18 +57,36 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     val notices: SharedFlow<String> = _notices
 
     init {
-        refreshModels()
+        viewModelScope.launch {
+            var first = true
+            settingsRepository.settings.collect { s ->
+                val keysChanged = s.anthropicKey != current.anthropicKey || s.openaiKey != current.openaiKey
+                val serversChanged = s.anthropicBaseUrl != current.anthropicBaseUrl || s.openaiBaseUrl != current.openaiBaseUrl
+                current = s
+                anthropic.baseUrl = s.anthropicBaseUrl.ifEmpty { ANTHROPIC_BASE_URL }
+                openai.baseUrl = s.openaiBaseUrl.ifEmpty { OPENAI_BASE_URL }
+                if (first) {
+                    first = false
+                    anthropic.model = s.anthropicModel
+                    anthropic.effort = s.anthropicEffort
+                    openai.model = s.openaiModel
+                    openai.effort = s.openaiEffort
+                    // Makes the start provider active and publishes the rest.
+                    session.selectModel(s.startIndex, providers[s.startIndex].model)
+                    refreshModels()
+                } else if (keysChanged || serversChanged) {
+                    refreshModels()
+                }
+            }
+        }
     }
 
     /** Lists each provider's models, for those with a key. */
-    fun refreshModels() {
+    private fun refreshModels() {
         if (hasKey(0) || hasKey(1)) session.refreshModels()
     }
 
-    fun hasKey(provider: Int) = when (provider) {
-        0 -> settings.anthropicKey.isNotEmpty()
-        else -> settings.openaiKey.isNotEmpty()
-    }
+    fun hasKey(provider: Int) = current.hasKey(provider)
 
     /** Sends [text]; returns whether it was sent, so the input can be cleared. */
     fun submit(text: String): Boolean {
@@ -76,9 +107,9 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
     fun newChat() = session.newChat()?.let(::notice)
 
-    fun saveKeys(anthropic: String, openai: String) {
-        settings.setKeys(anthropic, openai)
-        refreshModels()
+    /** Saves [settings]; keys and servers apply at once, the defaults when the app next starts. */
+    fun saveSettings(settings: UserSettings) {
+        viewModelScope.launch { settingsRepository.save(settings) }
     }
 
     private fun notice(text: String) {

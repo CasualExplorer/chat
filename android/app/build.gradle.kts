@@ -65,6 +65,8 @@ dependencies {
     implementation(libs.activity.compose)
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.runtime.compose)
+    implementation(libs.datastore.preferences)
+    // Only to read the API keys the app stored with it before (LegacySecretsMigration).
     implementation(libs.security.crypto)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.hilt.android)
@@ -77,6 +79,7 @@ dependencies {
     testImplementation(platform(libs.compose.bom))
     testImplementation(libs.compose.ui.test.junit4)
     testImplementation(libs.junit4)
+    testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.robolectric)
     testImplementation(libs.roborazzi)
 }

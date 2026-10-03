@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.casualexplorer.chat.ui.ChatScreen
 import com.casualexplorer.chat.ui.ChatTheme
@@ -29,11 +30,20 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun App(vm: ChatViewModel = viewModel()) {
+    // Nothing is drawn until the settings have loaded, which takes moments.
+    val settings = vm.settings.collectAsStateWithLifecycle().value ?: return
     // Settings opens first until there is a key to use.
-    var settingsOpen by rememberSaveable { mutableStateOf(!vm.hasKey(0) && !vm.hasKey(1)) }
+    var settingsOpen by rememberSaveable { mutableStateOf(!settings.hasKey(0) && !settings.hasKey(1)) }
     var input by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue()) }
     if (settingsOpen) {
-        SettingsScreen(vm, onBack = { settingsOpen = false })
+        SettingsScreen(
+            settings,
+            onSave = {
+                vm.saveSettings(it)
+                settingsOpen = false
+            },
+            onBack = { settingsOpen = false },
+        )
     } else {
         ChatScreen(vm, input, onInputChange = { input = it }, onOpenSettings = { settingsOpen = true })
     }

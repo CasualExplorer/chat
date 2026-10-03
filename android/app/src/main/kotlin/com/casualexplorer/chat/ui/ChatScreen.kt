@@ -104,6 +104,7 @@ fun ChatScreen(
     onOpenSettings: () -> Unit,
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val settings by vm.settings.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var showModels by rememberSaveable { mutableStateOf(false) }
     var showEffort by rememberSaveable { mutableStateOf(false) }
@@ -146,7 +147,7 @@ fun ChatScreen(
         ) {
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 if (state.messages.isEmpty()) {
-                    EmptyState(state, hasKey = vm.hasKey(state.active), onOpenSettings)
+                    EmptyState(state, hasKey = settings?.hasKey(state.active) == true, onOpenSettings)
                 } else {
                     MessageList(
                         state,
