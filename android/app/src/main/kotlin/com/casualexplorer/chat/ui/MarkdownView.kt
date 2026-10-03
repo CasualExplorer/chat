@@ -20,6 +20,7 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -27,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -38,10 +40,13 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.casualexplorer.chat.core.markdown.CodeHighlighter
+import com.casualexplorer.chat.core.markdown.Markdown as MarkdownParser
 import com.casualexplorer.chat.core.markdown.MdAlign
 import com.casualexplorer.chat.core.markdown.MdBlock
 import com.casualexplorer.chat.core.markdown.MdCodeBlock
@@ -55,7 +60,6 @@ import com.casualexplorer.chat.core.markdown.MdTable
 import com.casualexplorer.chat.core.markdown.StreamingMarkdown
 import com.casualexplorer.chat.core.markdown.TokenKind
 import com.casualexplorer.chat.core.markdown.parseInline
-import com.casualexplorer.chat.core.markdown.Markdown as MarkdownParser
 
 /** How markdown is drawn. Text takes the content colour of where it is drawn. */
 @Immutable
@@ -86,9 +90,15 @@ private fun mdColors(): MdColors {
     )
 }
 
+/**
+ * Message text takes its direction from its first strong character, not
+ * the layout: an English reply in a right-to-left UI keeps its punctuation
+ * where it belongs, and Arabic or Hebrew text reads right to left anywhere.
+ */
 @Composable
 private fun bodyStyle(style: MdStyle): TextStyle =
-    if (style.compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge
+    (if (style.compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge)
+        .copy(textDirection = TextDirection.Content)
 
 /**
  * Renders markdown that may still be streaming. While [streaming], blocks
@@ -166,7 +176,7 @@ private fun HeadingView(block: MdHeading, style: MdStyle) {
         block.level == 1 -> typography.titleLarge
         block.level == 2 -> typography.titleMedium
         else -> typography.titleSmall
-    }
+    }.copy(textDirection = TextDirection.Content)
     InlineText(block.text, style, textStyle, Modifier.semantics { heading() })
 }
 
@@ -175,6 +185,14 @@ private fun CodeBlockView(block: MdCodeBlock) {
     val codeColors = LocalCodeColors.current
     val plain = LocalContentColor.current
     val annotated = remember(block, codeColors, plain) { highlight(block, codeColors, plain) }
+    // Code is left to right in any language, and scrolls from its start.
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        CodeBox(annotated)
+    }
+}
+
+@Composable
+private fun CodeBox(annotated: AnnotatedString) {
     Box(
         Modifier
             .fillMaxWidth()
@@ -183,7 +201,11 @@ private fun CodeBlockView(block: MdCodeBlock) {
             .horizontalScroll(rememberScrollState())
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
-        Text(annotated, style = MaterialTheme.typography.bodyMedium.copy(fontFamily = CodeFont), softWrap = false)
+        Text(
+            annotated,
+            style = MaterialTheme.typography.bodyMedium.copy(fontFamily = CodeFont, textDirection = TextDirection.Ltr),
+            softWrap = false,
+        )
     }
 }
 
