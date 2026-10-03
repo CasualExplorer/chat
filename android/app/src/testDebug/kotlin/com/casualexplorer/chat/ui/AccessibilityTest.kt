@@ -41,5 +41,5 @@ class AccessibilityTest {
     fun noKey() = check { ChatScreenSample(SampleData.noKey) }
 
     @Test
-    fun settings() = check { SettingsScreen(SampleData.settings, onSave = {}, onBack = {}) }
+    fun settings() = check { SampleSettingsScreen() }
 }

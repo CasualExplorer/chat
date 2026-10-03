@@ -11,18 +11,40 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.casualexplorer.chat.core.EFFORTS
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** The app's settings, which stand in for the terminal app's environment variables and flags. */
+/**
+ * The app's settings, which stand in for the terminal app's environment
+ * variables and flags. Each is saved as soon as it changes, as Now in
+ * Android's user data is. Providers are numbered as in the chat: 0 is
+ * Anthropic, 1 is OpenAI.
+ */
 interface SettingsRepository {
     val settings: Flow<UserSettings>
 
-    suspend fun save(settings: UserSettings)
+    suspend fun setApiKey(provider: Int, key: String)
+
+    /** Sets the provider's server; an address that isn't blank or http(s) is ignored. */
+    suspend fun setBaseUrl(provider: Int, url: String)
+
+    suspend fun setActiveProvider(provider: Int)
+
+    /** Sets the provider's model; a blank one is ignored. */
+    suspend fun setModel(provider: Int, model: String)
+
+    /** Sets the provider's reasoning effort; one not in [EFFORTS] is ignored. */
+    suspend fun setEffort(provider: Int, effort: String)
+
+    suspend fun setTheme(theme: ThemeMode)
+
+    suspend fun setDynamicColor(enabled: Boolean)
 }
 
 /**
@@ -41,9 +63,9 @@ class DataStoreSettingsRepository @Inject constructor(
             openaiKey = p[Keys.OPENAI_KEY]?.let(cipher::decrypt).orEmpty(),
             anthropicBaseUrl = p[Keys.ANTHROPIC_BASE_URL]?.let(::normalizeBaseUrl).orEmpty(),
             openaiBaseUrl = p[Keys.OPENAI_BASE_URL]?.let(::normalizeBaseUrl).orEmpty(),
-            startProvider = p[Keys.START_PROVIDER]
-                ?.takeIf { it == UserSettings.START_ANTHROPIC || it == UserSettings.START_OPENAI }
-                ?: defaults.startProvider,
+            activeProvider = p[Keys.ACTIVE_PROVIDER]
+                ?.takeIf { it == UserSettings.ANTHROPIC || it == UserSettings.OPENAI }
+                ?: defaults.activeProvider,
             anthropicModel = p[Keys.ANTHROPIC_MODEL]?.takeIf { it.isNotBlank() } ?: defaults.anthropicModel,
             openaiModel = p[Keys.OPENAI_MODEL]?.takeIf { it.isNotBlank() } ?: defaults.openaiModel,
             anthropicEffort = p[Keys.ANTHROPIC_EFFORT]?.takeIf { it in EFFORTS } ?: defaults.anthropicEffort,
@@ -51,22 +73,41 @@ class DataStoreSettingsRepository @Inject constructor(
             theme = ThemeMode.entries.firstOrNull { it.name == p[Keys.THEME] } ?: defaults.theme,
             dynamicColor = p[Keys.DYNAMIC_COLOR] ?: defaults.dynamicColor,
         )
-    }.distinctUntilChanged()
+    }
+        // Decrypting the keys reaches the keystore; not on the main thread.
+        .flowOn(Dispatchers.Default)
+        .distinctUntilChanged()
 
-    override suspend fun save(settings: UserSettings) {
-        dataStore.edit { p ->
-            p[Keys.ANTHROPIC_KEY] = cipher.encrypt(settings.anthropicKey.trim())
-            p[Keys.OPENAI_KEY] = cipher.encrypt(settings.openaiKey.trim())
-            p[Keys.ANTHROPIC_BASE_URL] = normalizeBaseUrl(settings.anthropicBaseUrl).orEmpty()
-            p[Keys.OPENAI_BASE_URL] = normalizeBaseUrl(settings.openaiBaseUrl).orEmpty()
-            p[Keys.START_PROVIDER] = settings.startProvider
-            p[Keys.ANTHROPIC_MODEL] = settings.anthropicModel.trim()
-            p[Keys.OPENAI_MODEL] = settings.openaiModel.trim()
-            p[Keys.ANTHROPIC_EFFORT] = settings.anthropicEffort
-            p[Keys.OPENAI_EFFORT] = settings.openaiEffort
-            p[Keys.THEME] = settings.theme.name
-            p[Keys.DYNAMIC_COLOR] = settings.dynamicColor
-        }
+    override suspend fun setApiKey(provider: Int, key: String) {
+        // Encrypted inside the edit, on DataStore's own thread: the keystore is slow.
+        dataStore.edit { it[if (provider == 0) Keys.ANTHROPIC_KEY else Keys.OPENAI_KEY] = cipher.encrypt(key.trim()) }
+    }
+
+    override suspend fun setBaseUrl(provider: Int, url: String) {
+        val normalized = normalizeBaseUrl(url) ?: return
+        dataStore.edit { it[if (provider == 0) Keys.ANTHROPIC_BASE_URL else Keys.OPENAI_BASE_URL] = normalized }
+    }
+
+    override suspend fun setActiveProvider(provider: Int) {
+        dataStore.edit { it[Keys.ACTIVE_PROVIDER] = if (provider == 0) UserSettings.ANTHROPIC else UserSettings.OPENAI }
+    }
+
+    override suspend fun setModel(provider: Int, model: String) {
+        val trimmed = model.trim().ifEmpty { return }
+        dataStore.edit { it[if (provider == 0) Keys.ANTHROPIC_MODEL else Keys.OPENAI_MODEL] = trimmed }
+    }
+
+    override suspend fun setEffort(provider: Int, effort: String) {
+        if (effort !in EFFORTS) return
+        dataStore.edit { it[if (provider == 0) Keys.ANTHROPIC_EFFORT else Keys.OPENAI_EFFORT] = effort }
+    }
+
+    override suspend fun setTheme(theme: ThemeMode) {
+        dataStore.edit { it[Keys.THEME] = theme.name }
+    }
+
+    override suspend fun setDynamicColor(enabled: Boolean) {
+        dataStore.edit { it[Keys.DYNAMIC_COLOR] = enabled }
     }
 }
 
@@ -75,7 +116,8 @@ class DataStoreSettingsRepository @Inject constructor(
  * used, so SharedPreferencesMigration carries them over as they are.
  */
 internal object Keys {
-    val START_PROVIDER = stringPreferencesKey("start_provider")
+    /** Named for what it held before the provider picked in the chat was remembered. */
+    val ACTIVE_PROVIDER = stringPreferencesKey("start_provider")
     val ANTHROPIC_MODEL = stringPreferencesKey("anthropic_model")
     val OPENAI_MODEL = stringPreferencesKey("openai_model")
     val ANTHROPIC_EFFORT = stringPreferencesKey("anthropic_effort")

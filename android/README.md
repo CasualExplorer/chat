@@ -19,7 +19,7 @@ CI (`.github/workflows/android.yml`) runs lint, the screenshot tests, the unit t
 
 ## Setup
 
-There are no environment variables on Android, so the app opens on Settings until it has an API key. Settings live in Preferences DataStore (`app/.../data/SettingsRepository.kt`). The API keys in it are encrypted with AES-GCM under a key that never leaves the Android Keystore, and backups and device transfers leave the settings out. Settings also holds what the terminal app takes as flags or environment: an optional server for each API (blank for the official one), the provider to start with (OpenAI by default) and each provider's model (`claude-sonnet-5-5`, `gpt-5.6-luna`) and reasoning effort (`medium`). The first start after updating moves the settings and keys from the SharedPreferences used before.
+There are no environment variables on Android, so the app opens on Settings until it has an API key. Settings live in Preferences DataStore (`app/.../data/SettingsRepository.kt`). The API keys in it are encrypted with AES-GCM under a key that never leaves the Android Keystore, and backups and device transfers leave the settings out. Settings also holds an optional server for each API (blank for the official one) and the appearance. As in Now in Android, every setting is saved the moment it changes; there is no Save button. What the terminal app takes as flags, the provider and each provider's model and reasoning effort, is picked in the chat and remembered for the next start (at first OpenAI, `claude-sonnet-5-5`, `gpt-5.6-luna`, `medium`). The launch screen stays up until the settings have loaded. The first start after updating moves the settings and keys from the SharedPreferences used before.
 
 ## Use
 

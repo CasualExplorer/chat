@@ -6,16 +6,26 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.ViewModelProvider
 import com.casualexplorer.chat.ui.ChatApp
+import com.casualexplorer.chat.ui.SettingsUiState
+import com.casualexplorer.chat.ui.SettingsViewModel
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        // The same instance ChatApp gets: both belong to this activity.
+        val settingsViewModel = ViewModelProvider(this)[SettingsViewModel::class.java]
+        // The first screen depends on the settings, so the launch screen
+        // stays until they load, as in Now in Android.
+        splashScreen.setKeepOnScreenCondition { settingsViewModel.uiState.value is SettingsUiState.Loading }
         enableEdgeToEdge()
         setContent {
-            ChatApp(onDarkThemeChange = ::setSystemBars)
+            ChatApp(onDarkThemeChange = ::setSystemBars, settingsViewModel = settingsViewModel)
         }
     }
 

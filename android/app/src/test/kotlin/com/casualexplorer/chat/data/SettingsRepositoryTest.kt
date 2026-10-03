@@ -62,23 +62,23 @@ class SettingsRepositoryTest {
     fun keysAreStoredEncryptedAndReadBack() = runTest {
         val store = store()
         val repo = DataStoreSettingsRepository(store, FakeCipher())
-        repo.save(
-            UserSettings(
-                anthropicKey = " sk-ant ",
-                openaiKey = "sk-oa",
-                anthropicBaseUrl = "https://gateway.example/anthropic/",
-                startProvider = UserSettings.START_ANTHROPIC,
-                anthropicModel = "claude-opus-5-5",
-                openaiEffort = "max",
-            ),
-        )
+        repo.setApiKey(0, " sk-ant ")
+        repo.setApiKey(1, "sk-oa")
+        repo.setBaseUrl(0, "https://gateway.example/anthropic/")
+        repo.setActiveProvider(0)
+        repo.setModel(0, "claude-opus-5-5")
+        repo.setEffort(1, "max")
+        repo.setTheme(ThemeMode.Dark)
+        repo.setDynamicColor(false)
         val read = repo.settings.first()
         assertEquals("sk-ant", read.anthropicKey)
         assertEquals("sk-oa", read.openaiKey)
         assertEquals("https://gateway.example/anthropic", read.anthropicBaseUrl)
-        assertEquals(0, read.startIndex)
+        assertEquals(0, read.activeIndex)
         assertEquals("claude-opus-5-5", read.anthropicModel)
         assertEquals("max", read.openaiEffort)
+        assertEquals(ThemeMode.Dark, read.theme)
+        assertFalse(read.dynamicColor)
 
         val raw = store.raw()
         assertEquals("enc:tna-ks", raw["anthropic_api_key_encrypted"])
@@ -108,7 +108,7 @@ class SettingsRepositoryTest {
         val store = store(migrations = listOf(SharedPreferencesMigration(context, LEGACY_SETTINGS_PREFS), secrets))
         val read = DataStoreSettingsRepository(store, FakeCipher()).settings.first()
 
-        assertEquals(UserSettings.START_ANTHROPIC, read.startProvider)
+        assertEquals(UserSettings.ANTHROPIC, read.activeProvider)
         assertEquals("gpt-6-astra", read.openaiModel)
         assertEquals("high", read.anthropicEffort)
         assertEquals("sk-ant-old", read.anthropicKey)
@@ -123,14 +123,43 @@ class SettingsRepositoryTest {
     }
 
     @Test
-    fun invalidStoredValuesFallBackToDefaults() = runTest {
+    fun invalidValuesAreNotSaved() = runTest {
         val repo = DataStoreSettingsRepository(store(), FakeCipher())
-        repo.save(UserSettings(startProvider = "nope", anthropicEffort = "huge", openaiModel = " ", openaiBaseUrl = "ftp://x"))
+        repo.setBaseUrl(1, "https://ok.example")
+        repo.setEffort(0, "huge")
+        repo.setModel(1, " ")
+        // Typed on the way to a valid address: the last valid one stays.
+        repo.setBaseUrl(1, "ftp://x")
         val read = repo.settings.first()
-        assertEquals(UserSettings.START_OPENAI, read.startProvider)
+        assertEquals(UserSettings.DEFAULT_EFFORT, read.anthropicEffort)
+        assertEquals(UserSettings.DEFAULT_OPENAI_MODEL, read.openaiModel)
+        assertEquals("https://ok.example", read.openaiBaseUrl)
+    }
+
+    @Test
+    fun invalidStoredValuesFallBackToDefaults() = runTest {
+        val store = store()
+        store.updateData {
+            it.toMutablePreferences().apply {
+                this[Keys.ACTIVE_PROVIDER] = "nope"
+                this[Keys.ANTHROPIC_EFFORT] = "huge"
+                this[Keys.OPENAI_MODEL] = " "
+                this[Keys.OPENAI_BASE_URL] = "ftp://x"
+            }
+        }
+        val read = DataStoreSettingsRepository(store, FakeCipher()).settings.first()
+        assertEquals(UserSettings.OPENAI, read.activeProvider)
         assertEquals(UserSettings.DEFAULT_EFFORT, read.anthropicEffort)
         assertEquals(UserSettings.DEFAULT_OPENAI_MODEL, read.openaiModel)
         assertEquals("", read.openaiBaseUrl)
+    }
+
+    @Test
+    fun clearingAKeyStoresItEmpty() = runTest {
+        val repo = DataStoreSettingsRepository(store(), FakeCipher())
+        repo.setApiKey(1, "sk-oa")
+        repo.setApiKey(1, "")
+        assertEquals("", repo.settings.first().openaiKey)
     }
 
     @Test

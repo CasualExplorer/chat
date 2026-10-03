@@ -166,12 +166,15 @@ class ChatViewModel @Inject constructor(
 
     // The session refuses these while a reply streams; its English text is
     // replaced with the app's own strings.
+
+    /** Switches model or provider; the choice is remembered for the next start. */
     fun selectModel(provider: Int, model: String) {
-        if (session.selectModel(provider, model) != null) userMessage.value = SnackbarMessage(R.string.wait_switch_model)
+        if (!chat.selectModel(provider, model)) userMessage.value = SnackbarMessage(R.string.wait_switch_model)
     }
 
+    /** Sets the active provider's reasoning effort; it is remembered for the next start. */
     fun selectEffort(effort: String) {
-        if (session.selectEffort(effort) != null) userMessage.value = SnackbarMessage(R.string.wait_change_effort)
+        if (!chat.selectEffort(effort)) userMessage.value = SnackbarMessage(R.string.wait_change_effort)
     }
 
     fun newChat() {

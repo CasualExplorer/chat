@@ -72,6 +72,8 @@ internal object SampleData {
     val noKey = ChatUiState(chat = chat, hasKey = false)
 
     val settings = UserSettings(openaiKey = "sk-test", anthropicBaseUrl = "https://gateway.example/anthropic")
+
+    val settingsText = SettingsText(openaiKey = settings.openaiKey, anthropicBaseUrl = settings.anthropicBaseUrl)
 }
 
 /** The chat screen with no-op callbacks, for previews and screenshots. */
@@ -123,5 +125,17 @@ private fun NoKeyPreview() = ChatTheme(dynamicColor = false) { ChatScreenSample(
 @Preview(name = "Settings, dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun SettingsPreview() = ChatTheme(dynamicColor = false) {
-    SettingsScreen(SampleData.settings, onSave = {}, onBack = {})
+    SampleSettingsScreen()
 }
+
+/** The settings screen with [SampleData.settings], for previews and screenshot tests. */
+@Composable
+internal fun SampleSettingsScreen() = SettingsScreen(
+    settings = SampleData.settings,
+    text = SampleData.settingsText,
+    onApiKeyChange = { _, _ -> },
+    onBaseUrlChange = { _, _ -> },
+    onThemeChange = {},
+    onDynamicColorChange = {},
+    onBack = {},
+)

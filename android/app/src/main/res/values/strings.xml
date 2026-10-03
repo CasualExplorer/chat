@@ -83,7 +83,6 @@
 
     <!-- Settings -->
     <string name="back">Back</string>
-    <string name="save">Save</string>
     <string name="api_keys">API keys</string>
     <string name="api_keys_note">Stored on this device only, encrypted with a key in the Android Keystore. Sent only to the provider\'s API.</string>
     <string name="anthropic_key">Anthropic API key</string>
@@ -100,12 +99,5 @@
     <string name="anthropic_server">Anthropic server</string>
     <string name="openai_server">OpenAI server</string>
     <string name="server_invalid">Enter an http:// or https:// address, or leave it blank.</string>
-    <string name="defaults">Defaults</string>
-    <string name="defaults_note">Used when the app starts. In a chat, tap the model to switch model, provider and effort.</string>
-    <string name="start_with">Start with</string>
-    <string name="anthropic_model">Anthropic model</string>
-    <string name="openai_model">OpenAI model</string>
-    <string name="anthropic_effort">Anthropic reasoning effort</string>
-    <string name="openai_effort">OpenAI reasoning effort</string>
     <string name="privacy_note">Conversations are saved on this device. OpenAI requests use store: false. Long conversations are compacted by the provider, and prompts are cached.</string>
 </resources>

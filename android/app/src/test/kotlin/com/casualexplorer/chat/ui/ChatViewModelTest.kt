@@ -72,7 +72,11 @@ private class ScriptedProvider(
     override suspend fun listModels() = emptyList<ModelInfo>()
 }
 
-private class FakeChatRepository(override val session: ChatSession, override val settings: StateFlow<UserSettings?>) : ChatRepository
+private class FakeChatRepository(override val session: ChatSession, override val settings: StateFlow<UserSettings?>) : ChatRepository {
+    override fun selectModel(provider: Int, model: String) = session.selectModel(provider, model) == null
+
+    override fun selectEffort(effort: String) = session.selectEffort(effort) == null
+}
 
 private class FakeNetworkMonitor : NetworkMonitor {
     val online = MutableStateFlow(true)
@@ -85,7 +89,7 @@ class ChatViewModelTest {
     @get:Rule
     val main = MainDispatcherRule()
 
-    private val withKey = UserSettings(anthropicKey = "k", startProvider = UserSettings.START_ANTHROPIC)
+    private val withKey = UserSettings(anthropicKey = "k", activeProvider = UserSettings.ANTHROPIC)
 
     private val network = FakeNetworkMonitor()
 

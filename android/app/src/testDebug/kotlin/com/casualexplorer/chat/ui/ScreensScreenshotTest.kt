@@ -67,11 +67,11 @@ class ScreensScreenshotTest {
     fun noKey() = capture("chat_empty_no_key") { ChatScreenSample(SampleData.noKey) }
 
     @Test
-    fun settings() = capture("settings") { SettingsScreen(SampleData.settings, onSave = {}, onBack = {}) }
+    fun settings() = capture("settings") { SampleSettingsScreen() }
 
     @Test
     fun settingsDark() = capture("settings_dark", dark = true) {
-        SettingsScreen(SampleData.settings, onSave = {}, onBack = {})
+        SampleSettingsScreen()
     }
 
     @Test

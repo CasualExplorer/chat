@@ -171,6 +171,9 @@ class ChatSession(
         publish { it }
     }
 
+    /** The index of the provider in use, as of now; [state] follows a moment later. */
+    val active: Int get() = config.value.active
+
     /** The open conversation; null until the first message of a new chat. */
     private val conversationId = MutableStateFlow<Long?>(null)
 

@@ -4,8 +4,6 @@ import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,9 +17,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,7 +31,6 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -54,9 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.casualexplorer.chat.R
 import com.casualexplorer.chat.core.ANTHROPIC_BASE_URL
-import com.casualexplorer.chat.core.EFFORTS
 import com.casualexplorer.chat.core.OPENAI_BASE_URL
-import com.casualexplorer.chat.core.formatEffort
 import com.casualexplorer.chat.data.ThemeMode
 import com.casualexplorer.chat.data.UserSettings
 import com.casualexplorer.chat.data.normalizeBaseUrl
@@ -68,58 +61,35 @@ fun SettingsRoute(vm: SettingsViewModel, onDone: () -> Unit) {
         // The settings load in moments; the screen waits for them.
         SettingsUiState.Loading -> Box(Modifier.fillMaxSize())
         is SettingsUiState.Loaded -> SettingsScreen(
-            state.settings,
-            onSave = {
-                vm.save(it)
-                onDone()
-            },
+            settings = state.settings,
+            text = vm.text,
+            onApiKeyChange = vm::setApiKey,
+            onBaseUrlChange = vm::setBaseUrl,
+            onThemeChange = vm::setTheme,
+            onDynamicColorChange = vm::setDynamicColor,
             onBack = onDone,
         )
     }
 }
 
 /**
- * API keys, stored encrypted on the device, the theme, an optional server
- * for each API, and the defaults the terminal app takes as flags: which
- * provider to start with, each provider's model and reasoning effort. Keys,
- * servers and the theme apply at once; the defaults when the app next starts.
+ * API keys, stored encrypted on the device, the theme, and an optional
+ * server for each API. Every change is saved and applies at once, as in Now
+ * in Android's settings; there is nothing to confirm. The model, provider
+ * and reasoning effort are picked in the chat, which remembers them.
  */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(settings: UserSettings, onSave: (UserSettings) -> Unit, onBack: () -> Unit) {
-    var anthropicKey by rememberSaveable { mutableStateOf(settings.anthropicKey) }
-    var openaiKey by rememberSaveable { mutableStateOf(settings.openaiKey) }
+fun SettingsScreen(
+    settings: UserSettings,
+    text: SettingsText,
+    onApiKeyChange: (provider: Int, key: String) -> Unit,
+    onBaseUrlChange: (provider: Int, url: String) -> Unit,
+    onThemeChange: (ThemeMode) -> Unit,
+    onDynamicColorChange: (Boolean) -> Unit,
+    onBack: () -> Unit,
+) {
     var showKeys by rememberSaveable { mutableStateOf(false) }
-    var theme by rememberSaveable { mutableStateOf(settings.theme) }
-    var dynamicColor by rememberSaveable { mutableStateOf(settings.dynamicColor) }
-    var anthropicBaseUrl by rememberSaveable { mutableStateOf(settings.anthropicBaseUrl) }
-    var openaiBaseUrl by rememberSaveable { mutableStateOf(settings.openaiBaseUrl) }
-    var startProvider by rememberSaveable { mutableStateOf(settings.startProvider) }
-    var anthropicModel by rememberSaveable { mutableStateOf(settings.anthropicModel) }
-    var openaiModel by rememberSaveable { mutableStateOf(settings.openaiModel) }
-    var anthropicEffort by rememberSaveable { mutableStateOf(settings.anthropicEffort) }
-    var openaiEffort by rememberSaveable { mutableStateOf(settings.openaiEffort) }
-    val anthropicUrlValid = normalizeBaseUrl(anthropicBaseUrl) != null
-    val openaiUrlValid = normalizeBaseUrl(openaiBaseUrl) != null
-
-    fun save() {
-        if (!anthropicUrlValid || !openaiUrlValid) return
-        onSave(
-            UserSettings(
-                anthropicKey = anthropicKey,
-                openaiKey = openaiKey,
-                anthropicBaseUrl = anthropicBaseUrl,
-                openaiBaseUrl = openaiBaseUrl,
-                startProvider = startProvider,
-                anthropicModel = anthropicModel.ifBlank { UserSettings.DEFAULT_ANTHROPIC_MODEL },
-                openaiModel = openaiModel.ifBlank { UserSettings.DEFAULT_OPENAI_MODEL },
-                anthropicEffort = anthropicEffort,
-                openaiEffort = openaiEffort,
-                theme = theme,
-                dynamicColor = dynamicColor,
-            ),
-        )
-    }
 
     Scaffold(
         topBar = {
@@ -128,11 +98,6 @@ fun SettingsScreen(settings: UserSettings, onSave: (UserSettings) -> Unit, onBac
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-                    }
-                },
-                actions = {
-                    TextButton(onClick = ::save, enabled = anthropicUrlValid && openaiUrlValid) {
-                        Text(stringResource(R.string.save))
                     }
                 },
             )
@@ -150,8 +115,8 @@ fun SettingsScreen(settings: UserSettings, onSave: (UserSettings) -> Unit, onBac
         ) {
             Section(stringResource(R.string.api_keys))
             Note(stringResource(R.string.api_keys_note))
-            SecretField(stringResource(R.string.anthropic_key), anthropicKey, showKeys) { anthropicKey = it }
-            SecretField(stringResource(R.string.openai_key), openaiKey, showKeys) { openaiKey = it }
+            SecretField(stringResource(R.string.anthropic_key), text.anthropicKey, showKeys) { onApiKeyChange(0, it) }
+            SecretField(stringResource(R.string.openai_key), text.openaiKey, showKeys) { onApiKeyChange(1, it) }
             SwitchRow(stringResource(R.string.show_keys), null, showKeys) { showKeys = it }
 
             HorizontalDivider()
@@ -164,48 +129,29 @@ fun SettingsScreen(settings: UserSettings, onSave: (UserSettings) -> Unit, onBac
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                 themes.forEachIndexed { i, (mode, label) ->
                     SegmentedButton(
-                        selected = theme == mode,
-                        onClick = { theme = mode },
+                        selected = settings.theme == mode,
+                        onClick = { onThemeChange(mode) },
                         shape = SegmentedButtonDefaults.itemShape(i, themes.size),
                     ) { Text(label) }
                 }
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                SwitchRow(stringResource(R.string.dynamic_color), stringResource(R.string.dynamic_color_note), dynamicColor) {
-                    dynamicColor = it
-                }
+                SwitchRow(
+                    stringResource(R.string.dynamic_color),
+                    stringResource(R.string.dynamic_color_note),
+                    settings.dynamicColor,
+                    onDynamicColorChange,
+                )
             }
 
             HorizontalDivider()
             Section(stringResource(R.string.servers))
             Note(stringResource(R.string.servers_note))
-            UrlField(stringResource(R.string.anthropic_server), anthropicBaseUrl, ANTHROPIC_BASE_URL, anthropicUrlValid) { anthropicBaseUrl = it }
-            UrlField(stringResource(R.string.openai_server), openaiBaseUrl, OPENAI_BASE_URL, openaiUrlValid) { openaiBaseUrl = it }
-
-            HorizontalDivider()
-            Section(stringResource(R.string.defaults))
-            Note(stringResource(R.string.defaults_note))
-            Text(stringResource(R.string.start_with), style = MaterialTheme.typography.labelLarge)
-            val starts = listOf(UserSettings.START_ANTHROPIC to "Anthropic", UserSettings.START_OPENAI to "OpenAI")
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                starts.forEachIndexed { i, (value, label) ->
-                    SegmentedButton(
-                        selected = startProvider == value,
-                        onClick = { startProvider = value },
-                        shape = SegmentedButtonDefaults.itemShape(i, starts.size),
-                    ) { Text(label) }
-                }
-            }
-            PlainField(stringResource(R.string.anthropic_model), anthropicModel) { anthropicModel = it }
-            EffortRow(stringResource(R.string.anthropic_effort), anthropicEffort) { anthropicEffort = it }
-            PlainField(stringResource(R.string.openai_model), openaiModel) { openaiModel = it }
-            EffortRow(stringResource(R.string.openai_effort), openaiEffort) { openaiEffort = it }
+            UrlField(stringResource(R.string.anthropic_server), text.anthropicBaseUrl, ANTHROPIC_BASE_URL) { onBaseUrlChange(0, it) }
+            UrlField(stringResource(R.string.openai_server), text.openaiBaseUrl, OPENAI_BASE_URL) { onBaseUrlChange(1, it) }
 
             HorizontalDivider()
             Note(stringResource(R.string.privacy_note))
-            Button(onClick = ::save, enabled = anthropicUrlValid && openaiUrlValid, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.save))
-            }
             Spacer(Modifier.height(8.dp))
         }
     }
@@ -250,19 +196,9 @@ private fun SecretField(label: String, value: String, show: Boolean, onChange: (
 }
 
 @Composable
-private fun PlainField(label: String, value: String, onChange: (String) -> Unit) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onChange,
-        label = { Text(label) },
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, autoCorrectEnabled = false),
-        modifier = Modifier.fillMaxWidth(),
-    )
-}
-
-@Composable
-private fun UrlField(label: String, value: String, placeholder: String, valid: Boolean, onChange: (String) -> Unit) {
+private fun UrlField(label: String, value: String, placeholder: String, onChange: (String) -> Unit) {
+    // An invalid address isn't saved; the field says why until it is fixed.
+    val valid = normalizeBaseUrl(value) != null
     val error: (@Composable () -> Unit)? = if (valid) {
         null
     } else {
@@ -279,17 +215,4 @@ private fun UrlField(label: String, value: String, placeholder: String, valid: B
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, autoCorrectEnabled = false),
         modifier = Modifier.fillMaxWidth(),
     )
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun EffortRow(label: String, value: String, onChange: (String) -> Unit) {
-    Column {
-        Text(label, style = MaterialTheme.typography.labelLarge)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            for (effort in EFFORTS) {
-                FilterChip(selected = value == effort, onClick = { onChange(effort) }, label = { Text(formatEffort(effort)) })
-            }
-        }
-    }
 }
