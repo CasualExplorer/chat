@@ -4,7 +4,7 @@ A native Android port of the terminal chat client in the repository root, for th
 
 ## Build
 
-JDK 17+ and the Android SDK (compiles against API 37, targets API 36). The build uses Gradle 9.8, AGP 9.4 with its built-in Kotlin, Hilt and a version catalog (`gradle/libs.versions.toml`).
+JDK 21 (Robolectric needs it for SDK 36; the app compiles to Java 17) and the Android SDK (compiles against API 37, targets API 36). The build uses Gradle 9.8, AGP 9.4 with its built-in Kotlin, Hilt and a version catalog (`gradle/libs.versions.toml`).
 
 ```sh
 cd android

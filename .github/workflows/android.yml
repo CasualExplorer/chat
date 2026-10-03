@@ -32,10 +32,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Java 21: Robolectric runs SDK 35 and later only on Java 21. The app
+      # itself still compiles to Java 17 bytecode.
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
 
       # The runner image ships the Android SDK, with ANDROID_HOME set and the
       # licenses accepted. The Android Gradle plugin downloads any missing
