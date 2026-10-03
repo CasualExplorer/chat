@@ -242,6 +242,44 @@ class ChatSessionTest {
     }
 
     @Test
+    fun conversationsAreListedNewestFirstAndCanBeReopened() = sessionTest { scope, store ->
+        val p = FakeProvider("A", "m")
+        p.script = listOf(StreamEvent.Done(Turn(Role.Assistant, "ok")))
+        val s = scope.session(store, p)
+        s.submit("First chat\nwith two lines")
+        s.awaitReply()
+        val first = s.state.value.conversationId!!
+        s.newChat()
+        s.state.first { it.messages.isEmpty() }
+        s.submit("Second chat")
+        s.awaitReply()
+
+        val listed = s.state.first { it.conversations.size == 2 }.conversations
+        assertEquals(listOf("Second chat", "First chat"), listed.map { it.title }, "newest first, titled by the first line")
+
+        assertNull(s.openConversation(first))
+        val reopened = s.state.first { it.conversationId == first && it.messages.size == 2 }
+        assertEquals("First chat\nwith two lines", (reopened.messages.first() as UserMessage).text)
+        s.submit("More")
+        s.awaitReply(4)
+        assertEquals(listOf("First chat\nwith two lines", "ok", "More"), p.sent.last().map { it.text }, "the reopened chat continues")
+    }
+
+    @Test
+    fun deletingTheOpenConversationStartsANewChat() = sessionTest { scope, store ->
+        val p = FakeProvider("A", "m")
+        p.script = listOf(StreamEvent.Done(Turn(Role.Assistant, "ok")))
+        val s = scope.session(store, p)
+        s.submit("Delete me")
+        s.awaitReply()
+        val id = s.state.value.conversationId!!
+        assertNull(s.deleteConversation(id))
+        val state = s.state.first { it.conversations.isEmpty() && it.messages.isEmpty() }
+        assertNull(state.conversationId)
+        assertTrue(store.all.isEmpty(), "its messages are gone too")
+    }
+
+    @Test
     fun aStreamingReplyIsSavedAsItArrives() = sessionTest { scope, store ->
         val p = FakeProvider("A", "m")
         p.script = listOf(StreamEvent.Delta("so far"))

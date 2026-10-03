@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -91,6 +92,10 @@ data class ChatState(
     val requestEfforts: List<String> = emptyList(),
     /** The models each provider listed; empty until (or if) listing works. */
     val catalogs: List<List<ModelInfo>> = emptyList(),
+    /** The conversation shown; null for a new chat not sent yet. */
+    val conversationId: Long? = null,
+    /** Every stored conversation, the most recent first. */
+    val conversations: List<ConversationSummary> = emptyList(),
 ) {
     /** The current model's context window, if its provider reported it. */
     val contextWindow: Long
@@ -178,13 +183,20 @@ class ChatSession(
 
     val state: StateFlow<ChatState> = combine(
         config,
-        conversationId.flatMapLatest { id -> if (id == null) flowOf(emptyList()) else store.messages(id) },
+        // The id travels with its messages, so the state never pairs one
+        // conversation's id with another's messages while switching.
+        conversationId.flatMapLatest { id ->
+            if (id == null) flowOf(null to emptyList()) else store.messages(id).map { id to it }
+        },
         live,
-    ) { c, records, reply ->
+        store.conversations(),
+    ) { c, (id, records), reply, conversations ->
         c.copy(
             messages = records.map { r ->
                 if (reply != null && r.id == reply.id && r.status == ReplyStatus.Pending) reply else r.toChatMessage()
             },
+            conversationId = id,
+            conversations = conversations,
         )
     }.stateIn(scope, SharingStarted.Eagerly, config.value)
 
@@ -407,6 +419,26 @@ class ChatSession(
         if (config.value.streaming) return "Wait for the reply to finish (or tap Stop) before changing reasoning effort."
         providers[config.value.active].effort = effort
         publish { it }
+        return null
+    }
+
+    /** Shows conversation [id]; the next message continues it. */
+    fun openConversation(id: Long): String? {
+        if (config.value.streaming) return "Wait for the reply to finish (or tap Stop) before opening another chat."
+        chosen = true
+        if (conversationId.value == id) return null
+        conversationId.value = id
+        publish { it.copy(usage = null) }
+        scope.launch { restoreUsage(id) }
+        return null
+    }
+
+    /** Deletes conversation [id] and its messages; deleting the open one starts a new chat. */
+    fun deleteConversation(id: Long): String? {
+        val open = conversationId.value == id
+        if (open && config.value.streaming) return "Wait for the reply to finish (or tap Stop) before deleting this chat."
+        if (open) newChat()
+        scope.launch { store.deleteConversation(id) }
         return null
     }
 

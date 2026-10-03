@@ -40,6 +40,9 @@ data class MessageRecord(
     val openaiReplay: String? = null,
 )
 
+/** A conversation in the list of them. */
+data class ConversationSummary(val id: Long, val title: String, val updatedAt: Long)
+
 /**
  * Where conversations are kept. The app keeps them in Room; tests and
  * previews use [InMemoryConversationStore].
@@ -48,8 +51,14 @@ interface ConversationStore {
     /** The conversation's messages in the order they were added, as they change. */
     fun messages(conversationId: Long): Flow<List<MessageRecord>>
 
+    /** Every conversation, the one most recently added to first, as they change. */
+    fun conversations(): Flow<List<ConversationSummary>>
+
     /** The conversation most recently added to, if there is one. */
     suspend fun latestConversationId(): Long?
+
+    /** Removes the conversation and its messages. */
+    suspend fun deleteConversation(id: Long)
 
     suspend fun createConversation(title: String, now: Long): Long
 
@@ -76,8 +85,18 @@ class InMemoryConversationStore : ConversationStore {
     override fun messages(conversationId: Long): Flow<List<MessageRecord>> =
         records.map { all -> all.filter { it.conversationId == conversationId } }
 
+    override fun conversations(): Flow<List<ConversationSummary>> = conversations.map { all ->
+        all.sortedWith(compareByDescending<Conversation> { it.updatedAt }.thenByDescending { it.id })
+            .map { ConversationSummary(it.id, it.title, it.updatedAt) }
+    }
+
     override suspend fun latestConversationId(): Long? =
         conversations.value.maxWithOrNull(compareBy({ it.updatedAt }, { it.id }))?.id
+
+    override suspend fun deleteConversation(id: Long) {
+        records.update { all -> all.filter { it.conversationId != id } }
+        conversations.update { all -> all.filter { it.id != id } }
+    }
 
     override suspend fun createConversation(title: String, now: Long): Long {
         val id = nextId++

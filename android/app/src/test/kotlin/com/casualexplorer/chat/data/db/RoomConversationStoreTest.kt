@@ -80,5 +80,18 @@ class RoomConversationStoreTest {
         store.insert(MessageRecord(conversationId = old, role = Role.User, text = "again", createdAt = 3))
         assertEquals(old, store.latestConversationId())
         assertEquals(emptyList<MessageRecord>(), store.messages(new).first())
+        assertEquals(listOf("old", "new"), store.conversations().first().map { it.title })
+    }
+
+    @Test
+    fun deletingAConversationRemovesItsMessages() = runTest {
+        val keep = store.createConversation("keep", 1)
+        val drop = store.createConversation("drop", 2)
+        store.insert(MessageRecord(conversationId = keep, role = Role.User, text = "a", createdAt = 3))
+        store.insert(MessageRecord(conversationId = drop, role = Role.User, text = "b", createdAt = 4))
+        store.deleteConversation(drop)
+        assertEquals(listOf(keep), store.conversations().first().map { it.id })
+        assertEquals(emptyList<MessageRecord>(), store.messages(drop).first())
+        assertEquals(listOf("a"), store.messages(keep).first().map { it.text })
     }
 }

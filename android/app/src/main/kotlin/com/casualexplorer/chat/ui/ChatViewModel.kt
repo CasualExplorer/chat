@@ -150,6 +150,15 @@ class ChatViewModel @Inject constructor(
         if (warning != null) userMessage.value = warning else expanded.value = emptySet()
     }
 
+    fun openConversation(id: Long) {
+        val warning = session.openConversation(id)
+        if (warning != null) userMessage.value = warning else expanded.value = emptySet()
+    }
+
+    fun deleteConversation(id: Long) {
+        session.deleteConversation(id)?.let { userMessage.value = it }
+    }
+
     fun toggleThinking(replyId: Long) {
         expanded.update { if (replyId in it) it - replyId else it + replyId }
     }

@@ -32,19 +32,27 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -53,9 +61,11 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -102,11 +112,11 @@ import com.casualexplorer.chat.core.UserMessage
 import com.casualexplorer.chat.core.formatEffort
 import com.casualexplorer.chat.core.formatTokens
 import com.casualexplorer.chat.core.modelChoices
-import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import kotlinx.coroutines.launch
 
 /** The chat screen, connected to [vm]. */
 @Composable
@@ -125,6 +135,8 @@ fun ChatRoute(vm: ChatViewModel, onOpenSettings: () -> Unit) {
         onSelectModel = vm::selectModel,
         onSelectEffort = vm::selectEffort,
         onNewChat = vm::newChat,
+        onOpenConversation = vm::openConversation,
+        onDeleteConversation = vm::deleteConversation,
         onToggleThinking = vm::toggleThinking,
         onUserMessageShown = vm::userMessageShown,
         onOpenSettings = onOpenSettings,
@@ -154,10 +166,13 @@ fun ChatScreen(
     onUserMessageShown: () -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenConversation: (Long) -> Unit = {},
+    onDeleteConversation: (Long) -> Unit = {},
 ) {
     val state = uiState.chat
     val snackbar = remember { SnackbarHostState() }
     var showModels by rememberSaveable { mutableStateOf(false) }
+    val drawer = rememberDrawerState(DrawerValue.Closed)
     val clipboard = LocalClipboard.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -185,53 +200,78 @@ fun ChatScreen(
         }
     }
 
-    Scaffold(
-        modifier = modifier,
-        snackbarHost = { SnackbarHost(snackbar) },
-        topBar = {
-            TopAppBar(
-                title = { ModelTitle(state, onClick = { showModels = true }) },
-                actions = {
-                    IconButton(onClick = onNewChat) {
-                        Icon(Icons.Filled.Create, contentDescription = stringResource(R.string.new_chat))
-                    }
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.settings))
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        Column(
-            Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .consumeWindowInsets(padding)
-                .imePadding(),
-        ) {
-            Box(Modifier.weight(1f).fillMaxWidth()) {
-                if (state.messages.isEmpty()) {
-                    EmptyState(state, hasKey = uiState.hasKey, onOpenSettings)
-                } else {
-                    MessageList(
-                        state,
-                        expanded = uiState.expandedThinking,
-                        onToggleThinking = onToggleThinking,
-                        actions = actions,
-                        onRetry = onRetry,
-                    )
-                }
+    ModalNavigationDrawer(
+        drawerState = drawer,
+        drawerContent = {
+            ModalDrawerSheet {
+                ConversationList(
+                    state,
+                    onNewChat = {
+                        onNewChat()
+                        scope.launch { drawer.close() }
+                    },
+                    onOpen = {
+                        onOpenConversation(it)
+                        scope.launch { drawer.close() }
+                    },
+                    onDelete = onDeleteConversation,
+                )
             }
-            InputBar(
-                streaming = state.streaming,
-                input = input,
-                onInputChange = onInputChange,
-                onSend = onSend,
-                onStop = onStop,
-                onHistoryPrevious = onHistoryPrevious,
-                onHistoryNext = onHistoryNext,
-                onHistoryEscape = onHistoryEscape,
-            )
+        },
+        modifier = modifier,
+    ) {
+        Scaffold(
+            snackbarHost = { SnackbarHost(snackbar) },
+            topBar = {
+                TopAppBar(
+                    title = { ModelTitle(state, onClick = { showModels = true }) },
+                    navigationIcon = {
+                        IconButton(onClick = { scope.launch { drawer.open() } }) {
+                            Icon(Icons.Filled.Menu, contentDescription = stringResource(R.string.open_chats))
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = onNewChat) {
+                            Icon(Icons.Filled.Create, contentDescription = stringResource(R.string.new_chat))
+                        }
+                        IconButton(onClick = onOpenSettings) {
+                            Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.settings))
+                        }
+                    },
+                )
+            },
+        ) { padding ->
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .consumeWindowInsets(padding)
+                    .imePadding(),
+            ) {
+                Box(Modifier.weight(1f).fillMaxWidth()) {
+                    if (state.messages.isEmpty()) {
+                        EmptyState(state, hasKey = uiState.hasKey, onOpenSettings)
+                    } else {
+                        MessageList(
+                            state,
+                            expanded = uiState.expandedThinking,
+                            onToggleThinking = onToggleThinking,
+                            actions = actions,
+                            onRetry = onRetry,
+                        )
+                    }
+                }
+                InputBar(
+                    streaming = state.streaming,
+                    input = input,
+                    onInputChange = onInputChange,
+                    onSend = onSend,
+                    onStop = onStop,
+                    onHistoryPrevious = onHistoryPrevious,
+                    onHistoryNext = onHistoryNext,
+                    onHistoryEscape = onHistoryEscape,
+                )
+            }
         }
     }
 
@@ -244,6 +284,71 @@ fun ChatScreen(
             },
             onSelectEffort = onSelectEffort,
             onDismiss = { showModels = false },
+        )
+    }
+}
+
+/**
+ * The saved chats, the most recent first, under New chat. Each can be
+ * deleted, after a confirmation.
+ */
+@Composable
+private fun ConversationList(
+    state: ChatState,
+    onNewChat: () -> Unit,
+    onOpen: (Long) -> Unit,
+    onDelete: (Long) -> Unit,
+) {
+    var deleting by rememberSaveable { mutableStateOf<Long?>(null) }
+    Column(Modifier.padding(horizontal = 12.dp)) {
+        Text(
+            stringResource(R.string.chats),
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp).semantics { heading() },
+        )
+        NavigationDrawerItem(
+            label = { Text(stringResource(R.string.new_chat)) },
+            icon = { Icon(Icons.Filled.Create, contentDescription = null) },
+            selected = state.conversationId == null,
+            onClick = onNewChat,
+        )
+        HorizontalDivider(Modifier.padding(vertical = 8.dp))
+        if (state.conversations.isEmpty()) {
+            Text(
+                stringResource(R.string.no_chats),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(16.dp),
+            )
+        }
+        LazyColumn {
+            items(state.conversations, key = { it.id }) { conversation ->
+                NavigationDrawerItem(
+                    label = { Text(conversation.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    selected = conversation.id == state.conversationId,
+                    onClick = { onOpen(conversation.id) },
+                    badge = {
+                        IconButton(onClick = { deleting = conversation.id }) {
+                            Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete_chat))
+                        }
+                    },
+                )
+            }
+        }
+    }
+    val target = state.conversations.firstOrNull { it.id == deleting }
+    if (target != null) {
+        AlertDialog(
+            onDismissRequest = { deleting = null },
+            title = { Text(stringResource(R.string.delete_chat_title)) },
+            text = { Text(stringResource(R.string.delete_chat_text, target.title)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDelete(target.id)
+                    deleting = null
+                }) { Text(stringResource(R.string.delete)) }
+            },
+            dismissButton = { TextButton(onClick = { deleting = null }) { Text(stringResource(R.string.cancel)) } },
         )
     }
 }

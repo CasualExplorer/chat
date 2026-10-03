@@ -68,6 +68,22 @@ interface ChatDao {
     @Query("SELECT id FROM conversations ORDER BY updatedAt DESC, id DESC LIMIT 1")
     suspend fun latestConversationId(): Long?
 
+    @Query("SELECT * FROM conversations ORDER BY updatedAt DESC, id DESC")
+    fun conversations(): Flow<List<ConversationEntity>>
+
+    @Query("DELETE FROM messages WHERE conversationId = :id")
+    suspend fun deleteMessages(id: Long)
+
+    @Query("DELETE FROM conversations WHERE id = :id")
+    suspend fun deleteConversationOnly(id: Long)
+
+    /** Removes a conversation with its messages (explicitly, not relying on the foreign key's cascade). */
+    @Transaction
+    suspend fun deleteConversation(id: Long) {
+        deleteMessages(id)
+        deleteConversationOnly(id)
+    }
+
     @Insert
     suspend fun insertConversation(conversation: ConversationEntity): Long
 

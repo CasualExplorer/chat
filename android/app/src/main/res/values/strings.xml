@@ -8,6 +8,14 @@
     <string name="context_percent">%1$d%% of context</string>
     <string name="context_tokens">%1$s tokens</string>
     <string name="new_chat">New chat</string>
+    <string name="chats">Chats</string>
+    <string name="open_chats">Show chats</string>
+    <string name="no_chats">Chats you start are saved here.</string>
+    <string name="delete_chat">Delete chat</string>
+    <string name="delete_chat_title">Delete this chat?</string>
+    <string name="delete_chat_text">“%1$s” and its messages will be removed from this device.</string>
+    <string name="delete">Delete</string>
+    <string name="cancel">Cancel</string>
     <string name="settings">Settings</string>
 
     <!-- Chat: empty state -->

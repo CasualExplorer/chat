@@ -1,6 +1,7 @@
 package com.casualexplorer.chat.data.db
 
 import com.casualexplorer.chat.core.ConversationStore
+import com.casualexplorer.chat.core.ConversationSummary
 import com.casualexplorer.chat.core.MessageRecord
 import com.casualexplorer.chat.core.ReplyStatus
 import com.casualexplorer.chat.core.Role
@@ -14,7 +15,12 @@ class RoomConversationStore @Inject constructor(private val dao: ChatDao) : Conv
     override fun messages(conversationId: Long): Flow<List<MessageRecord>> =
         dao.messages(conversationId).map { list -> list.map { it.toRecord() } }
 
+    override fun conversations(): Flow<List<ConversationSummary>> =
+        dao.conversations().map { list -> list.map { ConversationSummary(it.id, it.title, it.updatedAt) } }
+
     override suspend fun latestConversationId(): Long? = dao.latestConversationId()
+
+    override suspend fun deleteConversation(id: Long) = dao.deleteConversation(id)
 
     override suspend fun createConversation(title: String, now: Long): Long =
         dao.insertConversation(ConversationEntity(title = title, createdAt = now, updatedAt = now))
