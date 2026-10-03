@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -57,6 +58,8 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PermanentDrawerSheet
+import androidx.compose.material3.PermanentNavigationDrawer
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
@@ -68,6 +71,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -107,6 +111,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.window.core.layout.WindowSizeClass
 import com.casualexplorer.chat.R
 import com.casualexplorer.chat.core.AssistantMessage
 import com.casualexplorer.chat.core.CONTEXT_WARN_PERCENT
@@ -123,6 +128,11 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import kotlinx.coroutines.launch
+
+/** How wide the conversation gets on a large screen. */
+private val MAX_CONTENT_WIDTH = 840.dp
+
+private val DRAWER_WIDTH = 300.dp
 
 /** The chat screen, connected to [vm]. */
 @Composable
@@ -184,6 +194,8 @@ fun ChatScreen(
     modifier: Modifier = Modifier,
     onOpenConversation: (Long) -> Unit = {},
     onDeleteConversation: (Long) -> Unit = {},
+    /** Room for the chats beside the conversation: expanded width (840dp) and up. */
+    wide: Boolean = currentWindowAdaptiveInfo().windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND),
 ) {
     val state = uiState.chat
     val snackbar = remember { SnackbarHostState() }
@@ -210,40 +222,39 @@ fun ChatScreen(
     }
 
     uiState.userMessage?.let { message ->
+        val text = stringResource(message.text, *message.args.toTypedArray())
         LaunchedEffect(message) {
-            snackbar.showSnackbar(message)
+            snackbar.showSnackbar(text)
             onUserMessageShown()
         }
     }
 
-    ModalNavigationDrawer(
-        drawerState = drawer,
-        drawerContent = {
-            ModalDrawerSheet {
-                ConversationList(
-                    state,
-                    onNewChat = {
-                        onNewChat()
-                        scope.launch { drawer.close() }
-                    },
-                    onOpen = {
-                        onOpenConversation(it)
-                        scope.launch { drawer.close() }
-                    },
-                    onDelete = onDeleteConversation,
-                )
-            }
-        },
-        modifier = modifier,
-    ) {
+    val chats: @Composable () -> Unit = {
+        ConversationList(
+            state,
+            onNewChat = {
+                onNewChat()
+                scope.launch { drawer.close() }
+            },
+            onOpen = {
+                onOpenConversation(it)
+                scope.launch { drawer.close() }
+            },
+            onDelete = onDeleteConversation,
+        )
+    }
+    val content: @Composable () -> Unit = {
         Scaffold(
             snackbarHost = { SnackbarHost(snackbar) },
             topBar = {
                 TopAppBar(
                     title = { ModelTitle(state, onClick = { showModels = true }) },
                     navigationIcon = {
-                        IconButton(onClick = { scope.launch { drawer.open() } }) {
-                            Icon(Icons.Filled.Menu, contentDescription = stringResource(R.string.open_chats))
+                        // On a wide screen the chats are always showing.
+                        if (!wide) {
+                            IconButton(onClick = { scope.launch { drawer.open() } }) {
+                                Icon(Icons.Filled.Menu, contentDescription = stringResource(R.string.open_chats))
+                            }
                         }
                     },
                     actions = {
@@ -257,40 +268,60 @@ fun ChatScreen(
                 )
             },
         ) { padding ->
-            Column(
+            // Lines of text stay readable on a tablet: the conversation is at
+            // most this wide, centred.
+            Box(
                 Modifier
                     .fillMaxSize()
                     .padding(padding)
                     .consumeWindowInsets(padding)
                     .imePadding(),
+                contentAlignment = Alignment.TopCenter,
             ) {
-                if (uiState.offline) OfflineBanner()
-                Box(Modifier.weight(1f).fillMaxWidth()) {
-                    if (state.messages.isEmpty()) {
-                        EmptyState(state, hasKey = uiState.hasKey, onOpenSettings)
-                    } else {
-                        MessageList(
-                            state,
-                            expanded = uiState.expandedThinking,
-                            onToggleThinking = onToggleThinking,
-                            actions = actions,
-                            onRetry = onRetry,
-                        )
+                Column(Modifier.widthIn(max = MAX_CONTENT_WIDTH).fillMaxSize()) {
+                    if (uiState.offline) OfflineBanner()
+                    Box(Modifier.weight(1f).fillMaxWidth()) {
+                        if (state.messages.isEmpty()) {
+                            EmptyState(state, hasKey = uiState.hasKey, onOpenSettings)
+                        } else {
+                            MessageList(
+                                state,
+                                expanded = uiState.expandedThinking,
+                                onToggleThinking = onToggleThinking,
+                                actions = actions,
+                                onRetry = onRetry,
+                            )
+                        }
                     }
+                    InputBar(
+                        streaming = state.streaming,
+                        offline = uiState.offline,
+                        input = input,
+                        onInputChange = onInputChange,
+                        onSend = onSend,
+                        onStop = onStop,
+                        onHistoryPrevious = onHistoryPrevious,
+                        onHistoryNext = onHistoryNext,
+                        onHistoryEscape = onHistoryEscape,
+                    )
                 }
-                InputBar(
-                    streaming = state.streaming,
-                    offline = uiState.offline,
-                    input = input,
-                    onInputChange = onInputChange,
-                    onSend = onSend,
-                    onStop = onStop,
-                    onHistoryPrevious = onHistoryPrevious,
-                    onHistoryNext = onHistoryNext,
-                    onHistoryEscape = onHistoryEscape,
-                )
             }
         }
+    }
+
+    if (wide) {
+        PermanentNavigationDrawer(
+            drawerContent = { PermanentDrawerSheet(Modifier.width(DRAWER_WIDTH)) { chats() } },
+            modifier = modifier,
+            content = content,
+        )
+    } else {
+        ModalNavigationDrawer(
+            drawerState = drawer,
+            drawerContent = { ModalDrawerSheet { chats() } },
+            modifier = modifier,
+            content = content,
+        )
     }
 
     if (showModels) {
@@ -382,7 +413,9 @@ private fun ModelTitle(state: ChatState, onClick: () -> Unit) {
         Modifier
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClickLabel = stringResource(R.string.switch_model), role = Role.Button, onClick = onClick)
+            .heightIn(min = 48.dp)
             .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.Center,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(

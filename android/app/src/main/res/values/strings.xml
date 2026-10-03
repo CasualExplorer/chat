@@ -24,6 +24,18 @@
     <string name="empty_no_key">Add your %1$s API key to start chatting.</string>
     <string name="open_settings">Open settings</string>
 
+    <!-- Chat: snackbar messages -->
+    <string name="add_key">Add your %1$s API key in Settings.</string>
+    <string name="wait_switch_model">Wait for the reply to finish (or tap Stop) before switching model.</string>
+    <string name="wait_change_effort">Wait for the reply to finish (or tap Stop) before changing reasoning effort.</string>
+    <string name="wait_new_chat">Wait for the reply to finish (or tap Stop) before starting a new chat.</string>
+    <string name="wait_open_chat">Wait for the reply to finish (or tap Stop) before opening another chat.</string>
+    <string name="wait_delete_chat">Wait for the reply to finish (or tap Stop) before deleting this chat.</string>
+
+    <!-- Chat: accessibility -->
+    <string name="message_from_you">You said: %1$s</string>
+    <string name="message_sent_at">Sent at %1$s</string>
+
     <!-- Chat: messages -->
     <string name="you">You</string>
     <string name="today">Today</string>

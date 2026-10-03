@@ -1,5 +1,6 @@
 package com.casualexplorer.chat.ui
 
+import androidx.annotation.StringRes
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -11,6 +12,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.SavedStateHandleSaveableApi
 import androidx.lifecycle.viewmodel.compose.saveable
+import com.casualexplorer.chat.R
 import com.casualexplorer.chat.core.AssistantMessage
 import com.casualexplorer.chat.core.ChatState
 import com.casualexplorer.chat.core.UserMessage
@@ -29,6 +31,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/** A snackbar message: a string resource and its arguments, which the screen resolves. */
+@Immutable
+data class SnackbarMessage(@StringRes val text: Int, val args: List<String> = emptyList())
+
 /** Everything the chat screen draws. */
 @Immutable
 data class ChatUiState(
@@ -38,7 +44,7 @@ data class ChatUiState(
     /** The replies whose whole thinking summary is shown. */
     val expandedThinking: Set<Long> = emptySet(),
     /** A short message for the snackbar, until [ChatViewModel.userMessageShown]. */
-    val userMessage: String? = null,
+    val userMessage: SnackbarMessage? = null,
     /** The device has no network that reaches the internet. */
     val offline: Boolean = false,
     /** The app hasn't asked for notification permission yet; it does on the first send. */
@@ -66,7 +72,7 @@ class ChatViewModel @Inject constructor(
         private set
 
     private val expanded = MutableStateFlow(emptySet<Long>())
-    private val userMessage = MutableStateFlow<String?>(null)
+    private val userMessage = MutableStateFlow<SnackbarMessage?>(null)
 
     private val online: StateFlow<Boolean> = networkMonitor.isOnline.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
@@ -105,11 +111,11 @@ class ChatViewModel @Inject constructor(
         val state = session.state.value
         if (draft.text.isBlank() || state.streaming) return
         if (chat.settings.value?.hasKey(state.active) != true) {
-            userMessage.value = "Add your ${state.providerNames.getOrElse(state.active) { "" }} API key in Settings."
+            userMessage.value = SnackbarMessage(R.string.add_key, listOf(state.providerNames.getOrElse(state.active) { "" }))
             return
         }
         if (!online.value) {
-            userMessage.value = OFFLINE
+            userMessage.value = SnackbarMessage(R.string.offline_send)
             return
         }
         // Cleared first: a reply can fail before submit returns, and its
@@ -137,11 +143,11 @@ class ChatViewModel @Inject constructor(
         if (state.streaming || !last.failed) return
         val question = state.messages.getOrNull(state.messages.size - 2) as? UserMessage ?: return
         if (chat.settings.value?.hasKey(state.active) != true) {
-            userMessage.value = "Add your ${state.providerNames.getOrElse(state.active) { "" }} API key in Settings."
+            userMessage.value = SnackbarMessage(R.string.add_key, listOf(state.providerNames.getOrElse(state.active) { "" }))
             return
         }
         if (!online.value) {
-            userMessage.value = OFFLINE
+            userMessage.value = SnackbarMessage(R.string.offline_send)
             return
         }
         val before = draft
@@ -170,26 +176,26 @@ class ChatViewModel @Inject constructor(
         return true
     }
 
+    // The session refuses these while a reply streams; its English text is
+    // replaced with the app's own strings.
     fun selectModel(provider: Int, model: String) {
-        session.selectModel(provider, model)?.let { userMessage.value = it }
+        if (session.selectModel(provider, model) != null) userMessage.value = SnackbarMessage(R.string.wait_switch_model)
     }
 
     fun selectEffort(effort: String) {
-        session.selectEffort(effort)?.let { userMessage.value = it }
+        if (session.selectEffort(effort) != null) userMessage.value = SnackbarMessage(R.string.wait_change_effort)
     }
 
     fun newChat() {
-        val warning = session.newChat()
-        if (warning != null) userMessage.value = warning else expanded.value = emptySet()
+        if (session.newChat() != null) userMessage.value = SnackbarMessage(R.string.wait_new_chat) else expanded.value = emptySet()
     }
 
     fun openConversation(id: Long) {
-        val warning = session.openConversation(id)
-        if (warning != null) userMessage.value = warning else expanded.value = emptySet()
+        if (session.openConversation(id) != null) userMessage.value = SnackbarMessage(R.string.wait_open_chat) else expanded.value = emptySet()
     }
 
     fun deleteConversation(id: Long) {
-        session.deleteConversation(id)?.let { userMessage.value = it }
+        if (session.deleteConversation(id) != null) userMessage.value = SnackbarMessage(R.string.wait_delete_chat)
     }
 
     fun toggleThinking(replyId: Long) {
@@ -198,9 +204,5 @@ class ChatViewModel @Inject constructor(
 
     fun userMessageShown() {
         userMessage.value = null
-    }
-
-    private companion object {
-        const val OFFLINE = "You're offline."
     }
 }

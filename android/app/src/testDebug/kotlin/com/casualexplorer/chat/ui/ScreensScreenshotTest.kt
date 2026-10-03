@@ -60,4 +60,18 @@ class ScreensScreenshotTest {
     fun settingsDark() = capture("settings_dark", dark = true) {
         SettingsScreen(SampleData.settings, onSave = {}, onBack = {})
     }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h800dp-xhdpi")
+    fun tabletShowsTheChatsBeside() = capture("chat_tablet") {
+        ChatScreenSample(SampleData.conversation, input = "And in Rust?", wide = true)
+    }
+
+    @Test
+    @Config(qualifiers = "w673dp-h841dp-xxhdpi")
+    fun foldable() = capture("chat_foldable") { ChatScreenSample(SampleData.conversation) }
+
+    @Test
+    @Config(qualifiers = "ldrtl-w411dp-h891dp-xxhdpi")
+    fun rightToLeft() = capture("chat_rtl") { ChatScreenSample(SampleData.conversation) }
 }

@@ -55,7 +55,9 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontStyle
@@ -87,7 +89,24 @@ private val TailRadius = 6.dp
 class MessageActions(
     val onCopy: (String) -> Unit,
     val onShare: (String) -> Unit,
-)
+) {
+    /** Copy and Share, as TalkBack's actions for a message with [text]. */
+    @Composable
+    fun accessibilityActions(text: String): List<CustomAccessibilityAction> {
+        val copy = stringResource(R.string.copy)
+        val share = stringResource(R.string.share)
+        return listOf(
+            CustomAccessibilityAction(copy) {
+                onCopy(text)
+                true
+            },
+            CustomAccessibilityAction(share) {
+                onShare(text)
+                true
+            },
+        )
+    }
+}
 
 /** The local time of [epochMs], e.g. "10:42" or "10:42 AM". */
 fun formatTime(epochMs: Long, zone: ZoneId = ZoneId.systemDefault()): String =
@@ -99,10 +118,21 @@ fun formatTime(epochMs: Long, zone: ZoneId = ZoneId.systemDefault()): String =
  */
 @Composable
 fun UserMessageView(item: ChatItem.Message, message: UserMessage, actions: MessageActions) {
+    // One TalkBack item per message, saying who sent it and when, with the
+    // long-press actions as accessibility actions.
+    val said = stringResource(R.string.message_from_you, message.text)
+    val sentAt = if (message.createdAt > 0) stringResource(R.string.message_sent_at, formatTime(message.createdAt)) else ""
+    val a11yActions = actions.accessibilityActions(message.text)
     // The start inset keeps a user's bubble from spanning the screen, so
     // the two sides read apart.
     Column(
-        Modifier.fillMaxWidth().padding(start = 56.dp, end = 16.dp),
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 56.dp, end = 16.dp)
+            .clearAndSetSemantics {
+                contentDescription = if (sentAt.isEmpty()) said else "$said. $sentAt"
+                customActions = a11yActions
+            },
         horizontalAlignment = Alignment.End,
     ) {
         val shape = RoundedCornerShape(
@@ -209,13 +239,16 @@ private fun MessageMenu(text: String, actions: MessageActions, content: @Composa
     var open by remember { mutableStateOf(false) }
     var selecting by rememberSaveable { mutableStateOf(false) }
     val label = stringResource(R.string.message_actions)
+    val a11yActions = actions.accessibilityActions(text)
     Box {
         content(
-            Modifier.combinedClickable(
-                onClick = {},
-                onLongClick = { open = true },
-                onLongClickLabel = label,
-            ),
+            Modifier
+                .combinedClickable(
+                    onClick = {},
+                    onLongClick = { open = true },
+                    onLongClickLabel = label,
+                )
+                .semantics { customActions = a11yActions },
         )
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             DropdownMenuItem(text = { Text(stringResource(R.string.copy)) }, onClick = {
@@ -373,7 +406,8 @@ private fun ErrorRow(reason: String, onRetry: (() -> Unit)?) {
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.errorContainer,
         contentColor = MaterialTheme.colorScheme.onErrorContainer,
-        modifier = Modifier.fillMaxWidth(),
+        // TalkBack announces a failure as it happens.
+        modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite },
     ) {
         Column(Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = if (onRetry == null) 12.dp else 0.dp)) {
             Row(verticalAlignment = Alignment.Top) {

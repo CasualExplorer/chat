@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.SavedStateHandle
+import com.casualexplorer.chat.R
 import com.casualexplorer.chat.core.AssistantMessage
 import com.casualexplorer.chat.core.ChatSession
 import com.casualexplorer.chat.core.InMemoryConversationStore
@@ -163,7 +164,7 @@ class ChatViewModelTest {
         vm.type("hi")
         vm.send()
         val state = vm.uiState.first { it.userMessage != null }
-        assertEquals("Add your Anthropic API key in Settings.", state.userMessage)
+        assertEquals(SnackbarMessage(R.string.add_key, listOf("Anthropic")), state.userMessage)
         assertFalse(state.hasKey)
         assertEquals("the draft is kept", "hi", vm.draft.text)
         assertTrue(state.chat.messages.isEmpty())
@@ -178,10 +179,7 @@ class ChatViewModelTest {
         vm.send()
         vm.uiState.first { it.chat.streaming }
         vm.selectModel(0, "other")
-        assertEquals(
-            "Wait for the reply to finish (or tap Stop) before switching model.",
-            vm.uiState.first { it.userMessage != null }.userMessage,
-        )
+        assertEquals(SnackbarMessage(R.string.wait_switch_model), vm.uiState.first { it.userMessage != null }.userMessage)
         vm.stop()
         assertTrue(vm.awaitReply().canceled)
     }
@@ -243,7 +241,7 @@ class ChatViewModelTest {
         vm.uiState.first { it.offline }
         vm.type("hi")
         vm.send()
-        assertEquals("You're offline.", vm.uiState.first { it.userMessage != null }.userMessage)
+        assertEquals(SnackbarMessage(R.string.offline_send), vm.uiState.first { it.userMessage != null }.userMessage)
         assertEquals("hi", vm.draft.text)
         assertEquals(0, repliesStarted)
         network.online.value = true

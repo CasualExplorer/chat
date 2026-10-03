@@ -6,6 +6,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.Preview
 import com.casualexplorer.chat.core.AssistantMessage
 import com.casualexplorer.chat.core.ChatState
+import com.casualexplorer.chat.core.ConversationSummary
 import com.casualexplorer.chat.core.Usage
 import com.casualexplorer.chat.core.UserMessage
 import com.casualexplorer.chat.data.UserSettings
@@ -58,6 +59,12 @@ internal object SampleData {
                 ),
             ),
             usage = Usage(input = 1_234, output = 56, context = 1_290),
+            conversationId = 3,
+            conversations = listOf(
+                ConversationSummary(3, "How do I reverse a list in Kotlin?", at(10, 43)),
+                ConversationSummary(2, "Plan a weekend in Lisbon", at(9, 15)),
+                ConversationSummary(1, "Explain the borrow checker", at(8, 2)),
+            ),
         ),
         hasKey = true,
     )
@@ -69,7 +76,13 @@ internal object SampleData {
 
 /** The chat screen with no-op callbacks, for previews and screenshots. */
 @Composable
-internal fun ChatScreenSample(uiState: ChatUiState, input: String = "", onToggleThinking: (Long) -> Unit = {}, onRetry: () -> Unit = {}) =
+internal fun ChatScreenSample(
+    uiState: ChatUiState,
+    input: String = "",
+    onToggleThinking: (Long) -> Unit = {},
+    onRetry: () -> Unit = {},
+    wide: Boolean = false,
+) =
     ChatScreen(
         uiState = uiState,
         input = TextFieldValue(input),
@@ -86,7 +99,14 @@ internal fun ChatScreenSample(uiState: ChatUiState, input: String = "", onToggle
         onToggleThinking = onToggleThinking,
         onUserMessageShown = {},
         onOpenSettings = {},
+        wide = wide,
     )
+
+@Preview(name = "Tablet", device = "spec:width=1280dp,height=800dp,dpi=240")
+@Composable
+private fun TabletPreview() = ChatTheme(dynamicColor = false) {
+    ChatScreenSample(SampleData.conversation, wide = true)
+}
 
 @Preview(name = "Light")
 @Preview(name = "Dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
