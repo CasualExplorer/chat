@@ -86,6 +86,8 @@ dependencies {
     implementation(libs.activity.compose)
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.runtime.compose)
+    // ProcessLifecycleOwner: leaving the app stops the reply.
+    implementation(libs.lifecycle.process)
     implementation(libs.core.ktx)
     implementation(libs.core.splashscreen)
     implementation(libs.navigation3.runtime)

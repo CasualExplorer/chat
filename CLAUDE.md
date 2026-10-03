@@ -61,8 +61,8 @@ non-idiomatic.
   backoff
 - Survives rotation and process death; history persisted in Room
 - No notifications and no background service (decided 2026-10-03): the
-  user opens the app, chats, and leaves it. A reply cut off because Android
-  closed the app shows as "Interrupted".
+  user opens the app, chats, and leaves it. Leaving the app stops the
+  reply being written, as Stop does.
 - Settings screen (server/host, username, theme) backed by DataStore
 - Material You dynamic color, light and dark themes
 - Adaptive layout using window size classes (phone, tablet, foldable)
