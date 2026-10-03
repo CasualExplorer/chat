@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     alias(libs.plugins.roborazzi)
@@ -62,6 +63,12 @@ room {
     schemaDirectory("$projectDir/schemas")
 }
 
+composeCompiler {
+    // core/ is compiled without the Compose compiler; this tells it which of
+    // its classes are immutable, so composables taking them can skip.
+    stabilityConfigurationFiles.add(rootProject.layout.projectDirectory.file("compose_stability.conf"))
+}
+
 ksp {
     arg("room.generateKotlin", "true")
 }
@@ -76,6 +83,9 @@ dependencies {
     implementation(libs.activity.compose)
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.runtime.compose)
+    implementation(libs.navigation3.runtime)
+    implementation(libs.navigation3.ui)
+    implementation(libs.kotlinx.serialization.core)
     implementation(libs.datastore.preferences)
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)

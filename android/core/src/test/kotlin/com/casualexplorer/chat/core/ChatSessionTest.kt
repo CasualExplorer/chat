@@ -97,13 +97,11 @@ class ChatSessionTest {
         val p = FakeProvider("A", "m")
         p.script = listOf(StreamEvent.Thinking("…"), StreamEvent.Failed(StreamError("Boom")))
         val s = scope.session(store, p)
-        var restored: String? = null
-        val collector = launch { restored = s.restoredInput.first() }
-        yield()
         s.submit("resend me")
         assertEquals("Boom", s.awaitReply().failure)
-        collector.join()
-        assertEquals("resend me", restored)
+        assertEquals("resend me", s.restoredInput.value, "kept until a screen handles it")
+        s.restoredInputHandled()
+        assertNull(s.restoredInput.value)
         assertTrue(s.turns().isEmpty(), "the message is left out of later requests")
         assertEquals(2, s.state.value.messages.size, "but both stay in the chat")
     }

@@ -43,10 +43,8 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -77,7 +75,6 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.casualexplorer.chat.ChatViewModel
 import com.casualexplorer.chat.core.AssistantMessage
 import com.casualexplorer.chat.core.CONTEXT_WARN_PERCENT
 import com.casualexplorer.chat.core.ChatState
@@ -91,34 +88,61 @@ import com.casualexplorer.chat.core.modelChoices
 private val body = TextStyle(fontFamily = Mono, fontSize = 14.sp, lineHeight = 20.sp)
 private val small = TextStyle(fontFamily = Mono, fontSize = 12.sp, lineHeight = 16.sp)
 
+/** The chat screen, connected to [vm]. */
+@Composable
+fun ChatRoute(vm: ChatViewModel, onOpenSettings: () -> Unit) {
+    val uiState by vm.uiState.collectAsStateWithLifecycle()
+    ChatScreen(
+        uiState = uiState,
+        input = vm.draft,
+        onInputChange = vm::onDraftChange,
+        onSend = vm::send,
+        onStop = vm::stop,
+        onHistoryPrevious = vm::historyPrevious,
+        onHistoryNext = vm::historyNext,
+        onHistoryEscape = vm::historyEscape,
+        onSelectModel = vm::selectModel,
+        onSelectEffort = vm::selectEffort,
+        onNewChat = vm::newChat,
+        onToggleThinking = vm::toggleThinking,
+        onUserMessageShown = vm::userMessageShown,
+        onOpenSettings = onOpenSettings,
+    )
+}
+
 /**
  * The conversation: the model bar on top, the messages, and the input.
- * [input] is hoisted so a draft survives a visit to Settings.
+ * The history callbacks return whether there was a message to show.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
-    vm: ChatViewModel,
+    uiState: ChatUiState,
     input: TextFieldValue,
     onInputChange: (TextFieldValue) -> Unit,
+    onSend: () -> Unit,
+    onStop: () -> Unit,
+    onHistoryPrevious: () -> Boolean,
+    onHistoryNext: () -> Boolean,
+    onHistoryEscape: () -> Boolean,
+    onSelectModel: (provider: Int, model: String) -> Unit,
+    onSelectEffort: (String) -> Unit,
+    onNewChat: () -> Unit,
+    onToggleThinking: (replyId: Long) -> Unit,
+    onUserMessageShown: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
-    val state by vm.state.collectAsStateWithLifecycle()
-    val settings by vm.settings.collectAsStateWithLifecycle()
+    val state = uiState.chat
     val snackbar = remember { SnackbarHostState() }
     var showModels by rememberSaveable { mutableStateOf(false) }
     var showEffort by rememberSaveable { mutableStateOf(false) }
-    // Which replies have their thinking expanded.
-    val expanded = remember { mutableStateMapOf<Long, Boolean>() }
     @Suppress("DEPRECATION")
     val clipboard = LocalClipboardManager.current
-    val currentInput by rememberUpdatedState(input)
 
-    LaunchedEffect(vm) { vm.notices.collect { snackbar.showSnackbar(it) } }
-    LaunchedEffect(vm) {
-        // A message whose reply failed before any text goes back in an empty input.
-        vm.restoredInput.collect { text ->
-            if (currentInput.text.isBlank()) onInputChange(TextFieldValue(text, TextRange(text.length)))
+    uiState.userMessage?.let { message ->
+        LaunchedEffect(message) {
+            snackbar.showSnackbar(message)
+            onUserMessageShown()
         }
     }
 
@@ -130,10 +154,7 @@ fun ChatScreen(
                 state,
                 onModel = { showModels = true },
                 onEffort = { showEffort = true },
-                onNewChat = {
-                    vm.newChat()
-                    expanded.clear()
-                },
+                onNewChat = onNewChat,
                 onSettings = onOpenSettings,
             )
         },
@@ -147,23 +168,26 @@ fun ChatScreen(
         ) {
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 if (state.messages.isEmpty()) {
-                    EmptyState(state, hasKey = settings?.hasKey(state.active) == true, onOpenSettings)
+                    EmptyState(state, hasKey = uiState.hasKey, onOpenSettings)
                 } else {
                     MessageList(
                         state,
-                        expanded = { expanded[it] == true },
-                        onToggle = { expanded[it] = expanded[it] != true },
+                        expanded = { it in uiState.expandedThinking },
+                        onToggle = onToggleThinking,
                         onCopy = { clipboard.setText(AnnotatedString(it)) },
                     )
                 }
             }
             HorizontalDivider(color = Palette.Separator)
             InputBar(
-                vm,
-                state,
-                input,
-                onInputChange,
-                onSend = { if (vm.submit(input.text)) onInputChange(TextFieldValue()) },
+                streaming = state.streaming,
+                input = input,
+                onInputChange = onInputChange,
+                onSend = onSend,
+                onStop = onStop,
+                onHistoryPrevious = onHistoryPrevious,
+                onHistoryNext = onHistoryNext,
+                onHistoryEscape = onHistoryEscape,
             )
         }
     }
@@ -172,7 +196,7 @@ fun ChatScreen(
         ModelSheet(
             state,
             onSelect = {
-                vm.selectModel(it.provider, it.model)
+                onSelectModel(it.provider, it.model)
                 showModels = false
             },
             onDismiss = { showModels = false },
@@ -182,7 +206,7 @@ fun ChatScreen(
         EffortSheet(
             state,
             onSelect = {
-                vm.selectEffort(it)
+                onSelectEffort(it)
                 showEffort = false
             },
             onDismiss = { showEffort = false },
@@ -347,11 +371,14 @@ private fun MessageList(
  */
 @Composable
 private fun InputBar(
-    vm: ChatViewModel,
-    state: ChatState,
+    streaming: Boolean,
     input: TextFieldValue,
     onInputChange: (TextFieldValue) -> Unit,
     onSend: () -> Unit,
+    onStop: () -> Unit,
+    onHistoryPrevious: () -> Boolean,
+    onHistoryNext: () -> Boolean,
+    onHistoryEscape: () -> Boolean,
 ) {
     var focused by remember { mutableStateOf(false) }
 
@@ -363,26 +390,12 @@ private fun InputBar(
         return when (event.key) {
             Key.Enter, Key.NumPadEnter -> {
                 if (!hardware || event.isShiftPressed || event.isAltPressed || event.isCtrlPressed) return false
-                if (!state.streaming) onSend()
+                if (!streaming) onSend()
                 true
             }
-            Key.DirectionUp -> {
-                if (!atStart && '\n' in input.text) return false
-                val text = vm.prompts.previous(input.text) ?: return false
-                onInputChange(TextFieldValue(text, TextRange(0)))
-                true
-            }
-            Key.DirectionDown -> {
-                if (!atEnd && '\n' in input.text) return false
-                val text = vm.prompts.next() ?: return false
-                onInputChange(TextFieldValue(text, TextRange(text.length)))
-                true
-            }
-            Key.Escape -> {
-                val text = vm.prompts.escape() ?: return false
-                onInputChange(TextFieldValue(text, TextRange(text.length)))
-                true
-            }
+            Key.DirectionUp -> (atStart || '\n' !in input.text) && onHistoryPrevious()
+            Key.DirectionDown -> (atEnd || '\n' !in input.text) && onHistoryNext()
+            Key.Escape -> onHistoryEscape()
             else -> false
         }
     }
@@ -402,11 +415,7 @@ private fun InputBar(
         Spacer(Modifier.width(8.dp))
         BasicTextField(
             value = input,
-            onValueChange = {
-                // Editing leaves the prompt history.
-                if (it.text != input.text) vm.prompts.edited(it.text)
-                onInputChange(it)
-            },
+            onValueChange = onInputChange,
             textStyle = body.copy(color = Palette.FgBase),
             cursorBrush = SolidColor(Palette.Secondary),
             maxLines = 8,
@@ -424,8 +433,8 @@ private fun InputBar(
                 }
             },
         )
-        if (state.streaming) {
-            IconButton(onClick = { vm.cancel() }) {
+        if (streaming) {
+            IconButton(onClick = onStop) {
                 Icon(Icons.Filled.Close, contentDescription = "Stop the reply", tint = Palette.Destructive)
             }
         } else {

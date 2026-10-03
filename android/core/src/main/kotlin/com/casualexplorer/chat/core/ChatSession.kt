@@ -4,9 +4,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -185,13 +183,19 @@ class ChatSession(
         )
     }.stateIn(scope, SharingStarted.Eagerly, config.value)
 
-    private val _restoredInput = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    private val _restoredInput = MutableStateFlow<String?>(null)
 
     /**
      * The message of a reply that failed before any text arrived, which goes
-     * back in the input to be resent if the input is empty.
+     * back in the input to be resent if the input is empty. It stays until
+     * [restoredInputHandled], so it isn't lost when no screen is showing.
      */
-    val restoredInput: SharedFlow<String> = _restoredInput
+    val restoredInput: StateFlow<String?> = _restoredInput
+
+    /** The screen has put [restoredInput] back, or decided not to. */
+    fun restoredInputHandled() {
+        _restoredInput.value = null
+    }
 
     /** The messages sent this session, for Up and Down in the input. */
     val prompts = PromptHistory()
@@ -344,7 +348,7 @@ class ChatSession(
         store.update(replyRecord(failed, conversation, inHistory = hasText))
         if (!hasText) {
             store.update(user.copy(inHistory = false))
-            _restoredInput.tryEmit(sentInput)
+            _restoredInput.value = sentInput
         }
     }
 

@@ -15,6 +15,14 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** The conversation and the settings the providers use, for the screens. */
+interface ChatRepository {
+    val session: ChatSession
+
+    /** The saved settings, or null until they have loaded. */
+    val settings: StateFlow<UserSettings?>
+}
+
 /**
  * The providers and the conversation, for the life of the process, so a
  * reply keeps streaming (and is saved) when the screen goes away.
@@ -24,11 +32,11 @@ import javax.inject.Singleton
  * settings first load, as the terminal app applies its flags.
  */
 @Singleton
-class ChatRepository @Inject constructor(
+class DefaultChatRepository @Inject constructor(
     settingsRepository: SettingsRepository,
     store: ConversationStore,
     @ApplicationScope scope: CoroutineScope,
-) {
+) : ChatRepository {
     /** The latest settings, which the providers read their keys from on each request. */
     @Volatile
     private var current = UserSettings()
@@ -37,10 +45,9 @@ class ChatRepository @Inject constructor(
     private val openai = OpenAIProvider(current.openaiModel, current.openaiEffort, { current.openaiKey })
     private val providers = listOf(anthropic, openai)
 
-    val session = ChatSession(providers, current.startIndex, store, scope)
+    override val session = ChatSession(providers, current.startIndex, store, scope)
 
-    /** The saved settings, or null until they have loaded. */
-    val settings: StateFlow<UserSettings?> = settingsRepository.settings.stateIn(scope, SharingStarted.Eagerly, null)
+    override val settings: StateFlow<UserSettings?> = settingsRepository.settings.stateIn(scope, SharingStarted.Eagerly, null)
 
     init {
         scope.launch {
@@ -67,10 +74,8 @@ class ChatRepository @Inject constructor(
         }
     }
 
-    fun hasKey(provider: Int) = current.hasKey(provider)
-
     /** Lists each provider's models, for those with a key. */
     private fun refreshModels() {
-        if (hasKey(0) || hasKey(1)) session.refreshModels()
+        if (current.hasKey(0) || current.hasKey(1)) session.refreshModels()
     }
 }

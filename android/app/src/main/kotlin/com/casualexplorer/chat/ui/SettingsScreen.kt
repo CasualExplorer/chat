@@ -1,8 +1,9 @@
 package com.casualexplorer.chat.ui
 
-import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -41,6 +42,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.casualexplorer.chat.core.ANTHROPIC_BASE_URL
 import com.casualexplorer.chat.core.EFFORTS
 import com.casualexplorer.chat.core.OPENAI_BASE_URL
@@ -50,6 +52,23 @@ import com.casualexplorer.chat.data.normalizeBaseUrl
 
 private val body = TextStyle(fontFamily = Mono, fontSize = 14.sp, lineHeight = 20.sp)
 private val small = TextStyle(fontFamily = Mono, fontSize = 12.sp, lineHeight = 16.sp)
+
+/** The settings screen, connected to [vm]. [onDone] leaves it. */
+@Composable
+fun SettingsRoute(vm: SettingsViewModel, onDone: () -> Unit) {
+    when (val state = vm.uiState.collectAsStateWithLifecycle().value) {
+        // The settings load in moments; the screen waits for them.
+        SettingsUiState.Loading -> Box(Modifier.fillMaxSize().background(Palette.BgBase))
+        is SettingsUiState.Loaded -> SettingsScreen(
+            state.settings,
+            onSave = {
+                vm.save(it)
+                onDone()
+            },
+            onBack = onDone,
+        )
+    }
+}
 
 /**
  * API keys, stored encrypted on the device, an optional server for each API,
@@ -72,8 +91,6 @@ fun SettingsScreen(settings: UserSettings, onSave: (UserSettings) -> Unit, onBac
     var openaiEffort by rememberSaveable { mutableStateOf(settings.openaiEffort) }
     val anthropicUrlValid = normalizeBaseUrl(anthropicBaseUrl) != null
     val openaiUrlValid = normalizeBaseUrl(openaiBaseUrl) != null
-
-    BackHandler(onBack = onBack)
 
     fun save() {
         if (!anthropicUrlValid || !openaiUrlValid) return

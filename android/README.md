@@ -47,7 +47,9 @@ Conversations are saved on the device in a Room database (`app/.../data/db/`), u
 | `core/.../ConversationStore.kt` | Where conversations are kept: the interface, its records, and an in-memory store for tests. |
 | `core/.../PromptHistory.kt` | `history.go`'s prompt history. |
 | `core/.../markdown/` | `markdown_stream.go`'s stable-prefix cache over a small block and inline parser, plus the code highlighter. |
-| `app/` | The Compose UI, settings and ViewModel. |
+| `app/.../data/` | Repositories: the chat (`ChatRepository`, which holds the providers and the session for the life of the process), settings in DataStore, the Room store, the network monitor. |
+| `app/.../di/` | Hilt modules. |
+| `app/.../ui/` | Compose screens and their ViewModels. `ChatApp.kt` is the Navigation 3 back stack; each screen has a `…Route` that connects its ViewModel and a stateless `…Screen` that takes an immutable UI state and callbacks. |
 
 The markdown renderer caches the parsed blocks of the stable prefix. While a reply streams, only the paragraph still arriving is re-parsed, and the earlier blocks stay the same instances, so Compose skips redrawing them.
 
