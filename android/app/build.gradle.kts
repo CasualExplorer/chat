@@ -86,7 +86,6 @@ dependencies {
     implementation(libs.activity.compose)
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.runtime.compose)
-    implementation(libs.lifecycle.process)
     implementation(libs.core.ktx)
     implementation(libs.navigation3.runtime)
     implementation(libs.navigation3.ui)

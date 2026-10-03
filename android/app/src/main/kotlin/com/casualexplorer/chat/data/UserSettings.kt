@@ -21,8 +21,6 @@ data class UserSettings(
     val theme: ThemeMode = ThemeMode.System,
     /** Material You colours from the wallpaper, on Android 12 and later. */
     val dynamicColor: Boolean = true,
-    /** Whether the app has asked for permission to post notifications. */
-    val notificationsAsked: Boolean = false,
 ) {
     /** Whether provider [index] (0 Anthropic, 1 OpenAI) has a key. */
     fun hasKey(index: Int) = if (index == 0) anthropicKey.isNotEmpty() else openaiKey.isNotEmpty()

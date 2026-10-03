@@ -4,11 +4,6 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- NetworkMonitor: whether the device is online. -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <!-- Replies that end in the background, and the one streaming (Android 13+ asks the user). -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- ReplyService keeps a streaming reply going in the background. -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <!-- Backups are off: the API keys are encrypted with a key that stays in
          this device's keystore, so a restored copy couldn't be read anyway. -->
@@ -30,14 +25,5 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <service
-            android:name=".notifications.ReplyService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
-
-        <receiver
-            android:name=".notifications.ReplyReceiver"
-            android:exported="false" />
     </application>
 </manifest>

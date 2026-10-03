@@ -23,9 +23,6 @@ interface SettingsRepository {
     val settings: Flow<UserSettings>
 
     suspend fun save(settings: UserSettings)
-
-    /** Records that the app has asked for notification permission, so it doesn't ask again. */
-    suspend fun markNotificationsAsked()
 }
 
 /**
@@ -53,7 +50,6 @@ class DataStoreSettingsRepository @Inject constructor(
             openaiEffort = p[Keys.OPENAI_EFFORT]?.takeIf { it in EFFORTS } ?: defaults.openaiEffort,
             theme = ThemeMode.entries.firstOrNull { it.name == p[Keys.THEME] } ?: defaults.theme,
             dynamicColor = p[Keys.DYNAMIC_COLOR] ?: defaults.dynamicColor,
-            notificationsAsked = p[Keys.NOTIFICATIONS_ASKED] ?: false,
         )
     }.distinctUntilChanged()
 
@@ -71,10 +67,6 @@ class DataStoreSettingsRepository @Inject constructor(
             p[Keys.THEME] = settings.theme.name
             p[Keys.DYNAMIC_COLOR] = settings.dynamicColor
         }
-    }
-
-    override suspend fun markNotificationsAsked() {
-        dataStore.edit { it[Keys.NOTIFICATIONS_ASKED] = true }
     }
 }
 
@@ -94,7 +86,6 @@ internal object Keys {
     val OPENAI_KEY = stringPreferencesKey("openai_api_key_encrypted")
     val THEME = stringPreferencesKey("theme")
     val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
-    val NOTIFICATIONS_ASKED = booleanPreferencesKey("notifications_asked")
     val SECRETS_MIGRATED = booleanPreferencesKey("legacy_secrets_migrated")
 }
 

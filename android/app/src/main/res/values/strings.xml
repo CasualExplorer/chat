@@ -73,17 +73,6 @@
     <string name="offline">You\'re offline. Messages can\'t be sent until you\'re back online.</string>
     <string name="offline_send">You\'re offline.</string>
 
-    <!-- Notifications -->
-    <string name="channel_replies">Replies</string>
-    <string name="channel_replies_description">A reply that finishes or fails while the app is in the background</string>
-    <string name="channel_streaming">Replies in progress</string>
-    <string name="channel_streaming_description">Shown while a reply streams, so it can finish in the background</string>
-    <string name="notification_streaming">Writing a reply…</string>
-    <string name="notification_stop">Stop</string>
-    <string name="notification_failed">Reply failed</string>
-    <string name="notification_reply">Reply</string>
-    <string name="notification_reply_label">Message</string>
-
     <!-- Model sheet -->
     <string name="model_sheet_title">Model</string>
     <string name="reasoning_effort">Reasoning effort · %1$s</string>

@@ -16,8 +16,6 @@ import com.casualexplorer.chat.data.LEGACY_SETTINGS_PREFS
 import com.casualexplorer.chat.data.LegacySecretsMigration
 import com.casualexplorer.chat.data.NetworkMonitor
 import com.casualexplorer.chat.data.SettingsRepository
-import com.casualexplorer.chat.notifications.ReplyKeepAlive
-import com.casualexplorer.chat.notifications.ServiceReplyKeepAlive
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -40,9 +38,6 @@ abstract class DataModule {
 
     @Binds
     abstract fun chatRepository(impl: DefaultChatRepository): ChatRepository
-
-    @Binds
-    abstract fun replyKeepAlive(impl: ServiceReplyKeepAlive): ReplyKeepAlive
 
     @Binds
     abstract fun networkMonitor(impl: ConnectivityManagerNetworkMonitor): NetworkMonitor

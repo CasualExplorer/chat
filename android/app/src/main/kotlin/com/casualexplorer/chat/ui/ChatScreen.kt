@@ -1,11 +1,8 @@
 package com.casualexplorer.chat.ui
 
-import android.Manifest
 import android.content.ClipData
 import android.content.Intent
 import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -122,7 +119,6 @@ import com.casualexplorer.chat.core.UserMessage
 import com.casualexplorer.chat.core.formatEffort
 import com.casualexplorer.chat.core.formatTokens
 import com.casualexplorer.chat.core.modelChoices
-import com.casualexplorer.chat.notifications.canNotify
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -138,21 +134,11 @@ private val DRAWER_WIDTH = 300.dp
 @Composable
 fun ChatRoute(vm: ChatViewModel, onOpenSettings: () -> Unit) {
     val uiState by vm.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-    // Asked once, on the first send: that is when it becomes clear why a
-    // chat app would notify (a reply finishing in the background).
-    val askPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
     ChatScreen(
         uiState = uiState,
         input = vm.draft,
         onInputChange = vm::onDraftChange,
-        onSend = {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && uiState.askNotifications && !canNotify(context)) {
-                askPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                vm.notificationsAsked()
-            }
-            vm.send()
-        },
+        onSend = vm::send,
         onStop = vm::stop,
         onRetry = vm::retry,
         onHistoryPrevious = vm::historyPrevious,

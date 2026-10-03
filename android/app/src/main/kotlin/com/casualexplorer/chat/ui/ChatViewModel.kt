@@ -18,8 +18,6 @@ import com.casualexplorer.chat.core.ChatState
 import com.casualexplorer.chat.core.UserMessage
 import com.casualexplorer.chat.data.ChatRepository
 import com.casualexplorer.chat.data.NetworkMonitor
-import com.casualexplorer.chat.data.SettingsRepository
-import com.casualexplorer.chat.notifications.ReplyKeepAlive
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -47,8 +45,6 @@ data class ChatUiState(
     val userMessage: SnackbarMessage? = null,
     /** The device has no network that reaches the internet. */
     val offline: Boolean = false,
-    /** The app hasn't asked for notification permission yet; it does on the first send. */
-    val askNotifications: Boolean = false,
 )
 
 /**
@@ -60,9 +56,7 @@ data class ChatUiState(
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val chat: ChatRepository,
-    private val settingsRepository: SettingsRepository,
     networkMonitor: NetworkMonitor,
-    private val keepAlive: ReplyKeepAlive,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     private val session = chat.session
@@ -84,7 +78,6 @@ class ChatViewModel @Inject constructor(
                 expandedThinking = exp,
                 userMessage = msg,
                 offline = !isOnline,
-                askNotifications = settings != null && !settings.notificationsAsked,
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ChatUiState(session.state.value))
 
@@ -122,12 +115,7 @@ class ChatViewModel @Inject constructor(
         // message only comes back into an empty input.
         val sent = draft
         draft = TextFieldValue()
-        if (session.submit(sent.text)) keepAlive.replyStarted() else draft = sent
-    }
-
-    /** The screen has asked for notification permission (whatever the answer). */
-    fun notificationsAsked() {
-        viewModelScope.launch { settingsRepository.markNotificationsAsked() }
+        if (!session.submit(sent.text)) draft = sent
     }
 
     fun stop() = session.cancel()
@@ -152,7 +140,7 @@ class ChatViewModel @Inject constructor(
         }
         val before = draft
         if (draft.text.trim() == question.text) draft = TextFieldValue()
-        if (session.submit(question.text)) keepAlive.replyStarted() else draft = before
+        if (!session.submit(question.text)) draft = before
     }
 
     /** Shows the previous message sent; false if there is none. */

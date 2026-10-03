@@ -16,7 +16,6 @@ import com.casualexplorer.chat.core.StreamEvent
 import com.casualexplorer.chat.core.Turn
 import com.casualexplorer.chat.data.ChatRepository
 import com.casualexplorer.chat.data.NetworkMonitor
-import com.casualexplorer.chat.data.SettingsRepository
 import com.casualexplorer.chat.data.UserSettings
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -26,7 +25,6 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.TestDispatcher
@@ -76,19 +74,6 @@ private class ScriptedProvider(
 
 private class FakeChatRepository(override val session: ChatSession, override val settings: StateFlow<UserSettings?>) : ChatRepository
 
-/** Settings in memory, shared with [FakeChatRepository]. */
-private class FakeSettingsRepository(val flow: MutableStateFlow<UserSettings?>) : SettingsRepository {
-    override val settings: Flow<UserSettings> = flow.filterNotNull()
-
-    override suspend fun save(settings: UserSettings) {
-        flow.value = settings
-    }
-
-    override suspend fun markNotificationsAsked() {
-        flow.value = flow.value?.copy(notificationsAsked = true)
-    }
-}
-
 private class FakeNetworkMonitor : NetworkMonitor {
     val online = MutableStateFlow(true)
     override val isOnline: Flow<Boolean> = online
@@ -103,18 +88,11 @@ class ChatViewModelTest {
     private val withKey = UserSettings(anthropicKey = "k", startProvider = UserSettings.START_ANTHROPIC)
 
     private val network = FakeNetworkMonitor()
-    private var repliesStarted = 0
 
     private fun CoroutineScope.viewModel(provider: Provider, settings: UserSettings = withKey): ChatViewModel {
         val session = ChatSession(listOf(provider), 0, InMemoryConversationStore(), this, debounceMs = 0)
         val flow = MutableStateFlow<UserSettings?>(settings)
-        return ChatViewModel(
-            FakeChatRepository(session, flow),
-            FakeSettingsRepository(flow),
-            network,
-            keepAlive = { repliesStarted++ },
-            SavedStateHandle(),
-        )
+        return ChatViewModel(FakeChatRepository(session, flow), network, SavedStateHandle())
     }
 
     private suspend fun ChatViewModel.awaitReply(count: Int = 2): AssistantMessage = uiState.first { s ->
@@ -226,15 +204,6 @@ class ChatViewModelTest {
     }
 
     @Test
-    fun aSentReplyIsKeptAliveInTheBackground() = runTest(main.dispatcher) {
-        val vm = backgroundScope.viewModel(ScriptedProvider(listOf(StreamEvent.Done(Turn(Role.Assistant, "ok")))))
-        vm.type("hi")
-        vm.send()
-        assertEquals(1, repliesStarted)
-        vm.awaitReply()
-    }
-
-    @Test
     fun offlineNothingIsSentAndTheDraftStays() = runTest(main.dispatcher) {
         val vm = backgroundScope.viewModel(ScriptedProvider())
         network.online.value = false
@@ -243,17 +212,8 @@ class ChatViewModelTest {
         vm.send()
         assertEquals(SnackbarMessage(R.string.offline_send), vm.uiState.first { it.userMessage != null }.userMessage)
         assertEquals("hi", vm.draft.text)
-        assertEquals(0, repliesStarted)
         network.online.value = true
         assertFalse(vm.uiState.first { !it.offline }.offline)
-    }
-
-    @Test
-    fun notificationPermissionIsAskedOnce() = runTest(main.dispatcher) {
-        val vm = backgroundScope.viewModel(ScriptedProvider())
-        assertTrue(vm.uiState.first { it.askNotifications }.askNotifications)
-        vm.notificationsAsked()
-        assertFalse(vm.uiState.first { !it.askNotifications }.askNotifications)
     }
 
     @Test

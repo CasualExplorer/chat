@@ -31,7 +31,7 @@ There are no environment variables on Android, so the app opens on Settings unti
 - **Appearance**: light, dark or the system's, with Material You colours from the wallpaper on Android 12 and later (Settings).
 - **Hardware keyboard**: Enter sends (Shift+Enter is a new line), Up/Down at the start/end of the input step through the messages sent this session, and Esc goes back to the draft.
 
-- **In the background**: while a reply streams, a foreground service (`notifications/ReplyService.kt`, type `dataSync`) keeps the app running, with an ongoing "Writing a reply…" notification that can stop it. A reply that finishes or fails while the app is in the background is posted as a notification, which can be answered inline; the answer is sent as the next message. On Android 13 and later the app asks for notification permission on the first send. If Android stops the app anyway, the reply shows as "Interrupted" on the next start.
+- **Leaving the app**: there are no notifications and no background service. A reply that is streaming when you leave keeps going while Android keeps the app in memory, and is saved as it arrives. If Android closes the app first, the reply shows as "Interrupted" on the next start.
 - **Offline**: a banner says so and Send is off until the device is back online.
 
 - **Large screens**: from 840dp wide (tablets, unfolded foldables, landscape on some phones) the chats stay open beside the conversation, which is at most 840dp wide.

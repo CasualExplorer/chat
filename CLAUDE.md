@@ -60,8 +60,9 @@ non-idiomatic.
   disconnected) driven by a Flow from the data layer; auto-reconnect with
   backoff
 - Survives rotation and process death; history persisted in Room
-- Notifications (channels, reply action) when backgrounded, with the
-  POST_NOTIFICATIONS runtime permission handled correctly
+- No notifications and no background service (decided 2026-10-03): the
+  user opens the app, chats, and leaves it. A reply cut off because Android
+  closed the app shows as "Interrupted".
 - Settings screen (server/host, username, theme) backed by DataStore
 - Material You dynamic color, light and dark themes
 - Adaptive layout using window size classes (phone, tablet, foldable)
