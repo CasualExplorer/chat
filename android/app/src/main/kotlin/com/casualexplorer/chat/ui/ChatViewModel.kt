@@ -122,8 +122,8 @@ class ChatViewModel @Inject constructor(
 
     /**
      * Sends again the message of the last reply, if that failed or was
-     * stopped, as if typed again. If the message is back in the input, it
-     * is taken out.
+     * stopped; the failed attempt is left out of later requests. If the
+     * message is back in the input, it is taken out.
      */
     fun retry() {
         val state = session.state.value
@@ -140,7 +140,7 @@ class ChatViewModel @Inject constructor(
         }
         val before = draft
         if (draft.text.trim() == question.text) draft = TextFieldValue()
-        if (!session.submit(question.text)) draft = before
+        if (!session.retry()) draft = before
     }
 
     /** Shows the previous message sent; false if there is none. */

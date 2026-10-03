@@ -93,6 +93,44 @@ class ChatSessionTest {
     }
 
     @Test
+    fun retryLeavesTheFailedAttemptOutOfLaterRequests() = sessionTest { scope, store ->
+        val p = FakeProvider("A", "m")
+        p.script = listOf(StreamEvent.Delta("partial"), StreamEvent.Failed(StreamError("Boom")))
+        val s = scope.session(store, p)
+        s.submit("hi")
+        s.awaitReply()
+
+        p.script = listOf(StreamEvent.Done(Turn(Role.Assistant, "Hello")))
+        assertTrue(s.retry())
+        assertEquals("Hello", s.awaitReply(4).text)
+        assertEquals(listOf("hi"), p.sent.last().map { it.text }, "the model sees the message once")
+        assertEquals(listOf("hi", "Hello"), s.turns().map { it.text })
+        assertEquals(4, s.state.value.messages.size, "the failed attempt stays in the chat")
+        assertFalse(s.retry(), "nothing to retry once a reply completed")
+    }
+
+    @Test
+    fun aStoreFailureEndsTheReplyNotTheApp() = sessionTest { scope, _ ->
+        // Saving the completed reply fails, as on a full disk.
+        val memory = InMemoryConversationStore()
+        val store = object : ConversationStore by memory {
+            override suspend fun update(record: MessageRecord) {
+                if (record.status == ReplyStatus.Done) throw IllegalStateException("disk full")
+                memory.update(record)
+            }
+        }
+        val p = FakeProvider("A", "m")
+        p.script = listOf(StreamEvent.Delta("Hi"), StreamEvent.Done(Turn(Role.Assistant, "Hi")))
+        val s = scope.session(store, p)
+        s.submit("hello")
+        val reply = s.state.first { !it.streaming && (it.messages.lastOrNull() as? AssistantMessage)?.failed == true }
+            .messages.last() as AssistantMessage
+        assertEquals("disk full", reply.failure)
+        assertEquals("Hi", reply.text, "what arrived stays on screen")
+        assertTrue(s.submit("again"), "the session can send again")
+    }
+
+    @Test
     fun failedReplyWithoutTextPutsTheMessageBack() = sessionTest { scope, store ->
         val p = FakeProvider("A", "m")
         p.script = listOf(StreamEvent.Thinking("…"), StreamEvent.Failed(StreamError("Boom")))

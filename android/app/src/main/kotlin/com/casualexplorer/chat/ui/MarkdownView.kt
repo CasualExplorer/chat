@@ -1,5 +1,6 @@
 package com.casualexplorer.chat.ui
 
+import android.util.LruCache
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -101,10 +102,18 @@ private fun bodyStyle(style: MdStyle): TextStyle =
         .copy(textDirection = TextDirection.Content)
 
 /**
+ * Finished messages parsed, by their text: a message scrolled back into view
+ * isn't parsed again on the main thread. Only touched from composition.
+ */
+private val parsedMessages = LruCache<String, List<MdBlock>>(PARSED_MESSAGES_KEPT)
+
+private const val PARSED_MESSAGES_KEPT = 200
+
+/**
  * Renders markdown that may still be streaming. While [streaming], blocks
  * come from a [StreamingMarkdown] cache, so only the paragraph still arriving
  * is re-parsed; the cached blocks are the same instances as before, so
- * Compose skips them. A finished message is parsed whole.
+ * Compose skips them. A finished message is parsed whole, once.
  */
 @Composable
 fun Markdown(text: String, streaming: Boolean, style: MdStyle, modifier: Modifier = Modifier) {
@@ -114,7 +123,7 @@ fun Markdown(text: String, streaming: Boolean, style: MdStyle, modifier: Modifie
             cache.render(text)
         } else {
             cache.reset()
-            MarkdownParser.parse(text)
+            parsedMessages.get(text) ?: MarkdownParser.parse(text).also { parsedMessages.put(text, it) }
         }
     }
     MarkdownBlocks(blocks, style, modifier)

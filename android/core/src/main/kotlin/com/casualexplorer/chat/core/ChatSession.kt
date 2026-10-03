@@ -275,14 +275,31 @@ class ChatSession(
      * Sends [text] to the active provider and streams the reply. It returns
      * false, sending nothing, if the text is blank or a reply is streaming.
      */
-    fun submit(text: String): Boolean {
+    fun submit(text: String): Boolean = start(text, retrying = emptySet())
+
+    /**
+     * Sends the last message again if its reply failed or was stopped. The
+     * failed attempt stays on screen but is left out of later requests, so
+     * the model sees the message once. It returns false, sending nothing, if
+     * there is nothing to retry or a reply is streaming.
+     */
+    fun retry(): Boolean {
+        val messages = state.value.messages
+        val reply = messages.lastOrNull() as? AssistantMessage ?: return false
+        val question = messages.getOrNull(messages.size - 2) as? UserMessage ?: return false
+        if (!reply.failed) return false
+        return start(question.text, retrying = setOf(question.id, reply.id))
+    }
+
+    /** Sends [text], first taking the messages [retrying] out of the history. */
+    private fun start(text: String, retrying: Set<Long>): Boolean {
         val message = text.trim()
         if (message.isEmpty() || config.value.streaming) return false
         val provider = providers[config.value.active]
         sentInput = text
         prompts.add(text)
         publish { it.copy(streaming = true) }
-        job = scope.launch { stream(provider, provider.model, message, clock()) }
+        job = scope.launch { stream(provider, provider.model, message, clock(), retrying) }
         return true
     }
 
@@ -291,17 +308,24 @@ class ChatSession(
         job?.cancel()
     }
 
-    private suspend fun stream(provider: Provider, model: String, message: String, start: Long) {
+    private suspend fun stream(provider: Provider, model: String, message: String, start: Long, retrying: Set<Long>) {
         var user: MessageRecord? = null
+        var replyId: Long? = null
         try {
             opening.join()
             val conversation = conversationId.value
                 ?: store.createConversation(title(message), start).also { conversationId.value = it }
             chosen = true
+            if (retrying.isNotEmpty()) {
+                store.messages(conversation).first()
+                    .filter { it.id in retrying && it.inHistory }
+                    .forEach { store.update(it.copy(inHistory = false)) }
+            }
             user = MessageRecord(conversationId = conversation, role = Role.User, text = message, createdAt = start)
                 .let { it.copy(id = store.insert(it)) }
             val pending = AssistantMessage(0, provider.name, model, startMs = start)
             live.value = pending.copy(id = store.insert(replyRecord(pending, conversation, inHistory = false)))
+            replyId = live.value?.id
             val history = store.messages(conversation).first().filter { it.inHistory }.map { it.toTurn() }
 
             var saved = clock()
@@ -333,16 +357,44 @@ class ChatSession(
                     }
                 }
             }
+        } catch (e: Exception) {
+            e.rethrowIfCancellation()
+            // The store failed (e.g. the disk is full). The reply ends with
+            // the error, rather than the app.
+            withContext(NonCancellable) {
+                val asked = user
+                val reply = live.value?.takeIf { it.id == replyId }
+                when {
+                    // No reply to show it on: the message goes back in the input.
+                    asked == null || reply == null -> {
+                        if (asked != null) tryStore { store.update(asked.copy(inHistory = false)) }
+                        _restoredInput.value = sentInput
+                    }
+                    reply.pending -> tryStore { fail(e, asked.conversationId, asked) }
+                    // It completed, but wasn't saved: it says so.
+                    else -> live.value = reply.copy(failure = describeError(e))
+                }
+            }
         } finally {
             withContext(NonCancellable) {
                 // Providers end with Done or Failed, except when cancelled.
                 val reply = live.value
-                if (reply != null && reply.pending && user != null) {
-                    fail(CancellationException("Cancelled"), user.conversationId, user)
+                val asked = user
+                if (reply != null && reply.pending && asked != null) {
+                    tryStore { fail(CancellationException("Cancelled"), asked.conversationId, asked) }
                 }
                 job = null
                 publish { it.copy(streaming = false) }
             }
+        }
+    }
+
+    /** Runs [write], ignoring a failure of the store: the reply on screen already says how it ended. */
+    private suspend fun tryStore(write: suspend () -> Unit) {
+        try {
+            write()
+        } catch (e: Exception) {
+            e.rethrowIfCancellation()
         }
     }
 

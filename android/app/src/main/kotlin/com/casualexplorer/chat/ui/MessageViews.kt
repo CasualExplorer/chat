@@ -8,7 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.StartOffset
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,12 +49,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.customActions
@@ -243,14 +245,18 @@ private fun MessageMenu(text: String, actions: MessageActions, content: @Composa
     val label = stringResource(R.string.message_actions)
     val a11yActions = actions.accessibilityActions(text)
     Box {
+        // Only a long press: a tap does nothing, so TalkBack isn't told to
+        // double-tap to activate it. Links in the text still take taps.
         content(
             Modifier
-                .combinedClickable(
-                    onClick = {},
-                    onLongClick = { open = true },
-                    onLongClickLabel = label,
-                )
-                .semantics { customActions = a11yActions },
+                .pointerInput(Unit) { detectTapGestures(onLongPress = { open = true }) }
+                .semantics {
+                    onLongClick(label) {
+                        open = true
+                        true
+                    }
+                    customActions = a11yActions
+                },
         )
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             DropdownMenuItem(text = { Text(stringResource(R.string.copy)) }, onClick = {

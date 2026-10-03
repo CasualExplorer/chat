@@ -27,7 +27,7 @@ There are no environment variables on Android, so the app opens on Settings unti
 - **Messages**: yours in bubbles on the end side, replies on the start side, grouped by sender with times and date headers. Long-press a message to copy, share or select its text. While a reply waits for its first words, a typing indicator shows how long it has been.
 - **Thinking**: the reasoning summary streams into a card above the reply (Anthropic `thinking.display: "summarized"`, OpenAI `reasoning.summary: "auto"`). A long one shows its last 10 lines until its header is tapped.
 - **Footer**: each finished reply shows "gpt-5.6-luna · 2.3s · 12.4K in · 845 out · 10:42".
-- **Send / Stop**: while a reply streams, Send becomes Stop. A failed or stopped last reply offers Retry, which sends its message again.
+- **Send / Stop**: while a reply streams, Send becomes Stop. A failed or stopped last reply offers Retry, which sends its message again; the failed attempt stays on screen but is left out of later requests, so the model sees the message once.
 - **Appearance**: light, dark or the system's, with Material You colours from the wallpaper on Android 12 and later (Settings).
 - **Hardware keyboard**: Enter sends (Shift+Enter is a new line), Up/Down at the start/end of the input step through the messages sent this session, and Esc goes back to the draft.
 
@@ -37,7 +37,7 @@ There are no environment variables on Android, so the app opens on Settings unti
 - **Large screens**: from 840dp wide (tablets, unfolded foldables, landscape on some phones) the chats stay open beside the conversation, which is at most 840dp wide.
 - **Accessibility**: each message of yours is one TalkBack item ("You said: … Sent at 10:42"), with Copy and Share as actions on every message; failures and the typing indicator are announced; text follows the system font size. The screenshot tests run the Accessibility Test Framework's checks.
 
-A reply that fails or is stopped stays in the chat, ending in an ERROR banner with the reason, or "Canceled". Any text that arrived is kept and sent with later turns. If none arrived, the message is left out of later requests and put back in the input to resend.
+A reply that fails or is stopped stays in the chat, ending in an ERROR banner with the reason, or "Canceled". Any text that arrived is kept and sent with later turns, unless the reply is retried. If none arrived, the message is left out of later requests and put back in the input to resend.
 
 Conversations are saved on the device in a Room database (`app/.../data/db/`), unlike the terminal app, which keeps them in memory. Each reply is saved with what its provider returned (Anthropic thinking blocks, OpenAI encrypted reasoning), so continuing a conversation after a restart sends exactly what the terminal app would within one run. A streaming reply is saved about once a second, and one the app was closed during is marked "Interrupted" on the next start, by the same rules as a failed reply. The app opens the most recent conversation; New chat starts another and keeps the old one. Nothing is stored server-side: OpenAI requests use `store: false`. Long conversations are compacted server-side: Anthropic past its 150k-token default, OpenAI past 200k, with a note under the reply when it happens. Anthropic requests use automatic prompt caching (top-level `cache_control`), and OpenAI requests share one `prompt_cache_key` per session.
 
