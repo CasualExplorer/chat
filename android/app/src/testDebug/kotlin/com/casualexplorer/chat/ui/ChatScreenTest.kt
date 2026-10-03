@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.casualexplorer.chat.core.AssistantMessage
 import com.casualexplorer.chat.core.UserMessage
 import org.junit.Assert.assertEquals
@@ -22,8 +23,10 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
+// A phone-sized screen: Robolectric's default is small enough to push the
+// thinking header out of view.
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36], application = Application::class)
+@Config(sdk = [36], qualifiers = "w411dp-h891dp-xxhdpi", application = Application::class)
 class ChatScreenTest {
     @get:Rule
     val composeRule = createComposeRule()
@@ -95,7 +98,7 @@ class ChatScreenTest {
             }
         }
         composeRule.onNodeWithText("… 19 earlier lines").assertExists()
-        composeRule.onNodeWithText("Thought for 0.8s").performClick()
+        composeRule.onNodeWithText("Thought for 0.8s").performScrollTo().performClick()
         composeRule.waitForIdle()
         assertEquals("tapping the header toggles the reply's thinking", setOf(2L), expanded)
         composeRule.onAllNodesWithText("earlier lines", substring = true).assertCountEquals(0)
