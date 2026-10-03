@@ -166,4 +166,15 @@ class ChatScreenTest {
         composeRule.onNodeWithText("Delete").performClick()
         assertEquals(listOf(3L), deleted)
     }
+
+    @Test
+    fun offlineShowsABannerAndSendIsOff() {
+        composeRule.setContent {
+            ChatTheme(dynamicColor = false) {
+                ChatScreenSample(SampleData.conversation.copy(offline = true), input = "Hello")
+            }
+        }
+        composeRule.onNodeWithText("offline", substring = true).assertExists()
+        composeRule.onNodeWithContentDescription("Send").assertIsNotEnabled()
+    }
 }

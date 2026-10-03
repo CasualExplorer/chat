@@ -1,8 +1,11 @@
 package com.casualexplorer.chat.ui
 
+import android.Manifest
 import android.content.ClipData
 import android.content.Intent
 import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -92,9 +95,11 @@ import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.TextFieldValue
@@ -112,6 +117,7 @@ import com.casualexplorer.chat.core.UserMessage
 import com.casualexplorer.chat.core.formatEffort
 import com.casualexplorer.chat.core.formatTokens
 import com.casualexplorer.chat.core.modelChoices
+import com.casualexplorer.chat.notifications.canNotify
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -122,11 +128,21 @@ import kotlinx.coroutines.launch
 @Composable
 fun ChatRoute(vm: ChatViewModel, onOpenSettings: () -> Unit) {
     val uiState by vm.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    // Asked once, on the first send: that is when it becomes clear why a
+    // chat app would notify (a reply finishing in the background).
+    val askPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
     ChatScreen(
         uiState = uiState,
         input = vm.draft,
         onInputChange = vm::onDraftChange,
-        onSend = vm::send,
+        onSend = {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && uiState.askNotifications && !canNotify(context)) {
+                askPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                vm.notificationsAsked()
+            }
+            vm.send()
+        },
         onStop = vm::stop,
         onRetry = vm::retry,
         onHistoryPrevious = vm::historyPrevious,
@@ -248,6 +264,7 @@ fun ChatScreen(
                     .consumeWindowInsets(padding)
                     .imePadding(),
             ) {
+                if (uiState.offline) OfflineBanner()
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     if (state.messages.isEmpty()) {
                         EmptyState(state, hasKey = uiState.hasKey, onOpenSettings)
@@ -263,6 +280,7 @@ fun ChatScreen(
                 }
                 InputBar(
                     streaming = state.streaming,
+                    offline = uiState.offline,
                     input = input,
                     onInputChange = onInputChange,
                     onSend = onSend,
@@ -511,6 +529,20 @@ private fun MessageList(
     }
 }
 
+/** Under the top bar while the device is offline. TalkBack announces it when it appears. */
+@Composable
+private fun OfflineBanner() {
+    Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) {
+        Text(
+            stringResource(R.string.offline),
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .semantics { liveRegion = LiveRegionMode.Polite },
+        )
+    }
+}
+
 /** "Today", "Yesterday", or the date. */
 @Composable
 private fun DateHeader(day: LocalDate, zone: ZoneId) {
@@ -538,6 +570,7 @@ private fun DateHeader(day: LocalDate, zone: ZoneId) {
 @Composable
 private fun InputBar(
     streaming: Boolean,
+    offline: Boolean,
     input: TextFieldValue,
     onInputChange: (TextFieldValue) -> Unit,
     onSend: () -> Unit,
@@ -554,7 +587,7 @@ private fun InputBar(
         return when (event.key) {
             Key.Enter, Key.NumPadEnter -> {
                 if (!hardware || event.isShiftPressed || event.isAltPressed || event.isCtrlPressed) return false
-                if (!streaming) onSend()
+                if (!streaming && !offline) onSend()
                 true
             }
             Key.DirectionUp -> (atStart || '\n' !in input.text) && onHistoryPrevious()
@@ -591,7 +624,7 @@ private fun InputBar(
                         Box(Modifier.size(14.dp).clip(RoundedCornerShape(2.dp)).background(LocalContentColor.current))
                     }
                 } else {
-                    FilledIconButton(onClick = onSend, enabled = input.text.isNotBlank()) {
+                    FilledIconButton(onClick = onSend, enabled = input.text.isNotBlank() && !offline) {
                         Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.send))
                     }
                 }

@@ -15,6 +15,9 @@ import com.casualexplorer.chat.core.AssistantMessage
 import com.casualexplorer.chat.core.ChatState
 import com.casualexplorer.chat.core.UserMessage
 import com.casualexplorer.chat.data.ChatRepository
+import com.casualexplorer.chat.data.NetworkMonitor
+import com.casualexplorer.chat.data.SettingsRepository
+import com.casualexplorer.chat.notifications.ReplyKeepAlive
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -36,6 +39,10 @@ data class ChatUiState(
     val expandedThinking: Set<Long> = emptySet(),
     /** A short message for the snackbar, until [ChatViewModel.userMessageShown]. */
     val userMessage: String? = null,
+    /** The device has no network that reaches the internet. */
+    val offline: Boolean = false,
+    /** The app hasn't asked for notification permission yet; it does on the first send. */
+    val askNotifications: Boolean = false,
 )
 
 /**
@@ -47,6 +54,9 @@ data class ChatUiState(
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val chat: ChatRepository,
+    private val settingsRepository: SettingsRepository,
+    networkMonitor: NetworkMonitor,
+    private val keepAlive: ReplyKeepAlive,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     private val session = chat.session
@@ -58,9 +68,19 @@ class ChatViewModel @Inject constructor(
     private val expanded = MutableStateFlow(emptySet<Long>())
     private val userMessage = MutableStateFlow<String?>(null)
 
-    val uiState: StateFlow<ChatUiState> = combine(session.state, chat.settings, expanded, userMessage) { state, settings, exp, msg ->
-        ChatUiState(state, settings?.hasKey(state.active) == true, exp, msg)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ChatUiState(session.state.value))
+    private val online: StateFlow<Boolean> = networkMonitor.isOnline.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    val uiState: StateFlow<ChatUiState> =
+        combine(session.state, chat.settings, expanded, userMessage, online) { state, settings, exp, msg, isOnline ->
+            ChatUiState(
+                chat = state,
+                hasKey = settings?.hasKey(state.active) == true,
+                expandedThinking = exp,
+                userMessage = msg,
+                offline = !isOnline,
+                askNotifications = settings != null && !settings.notificationsAsked,
+            )
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ChatUiState(session.state.value))
 
     init {
         // A message whose reply failed before any text goes back in the
@@ -88,11 +108,20 @@ class ChatViewModel @Inject constructor(
             userMessage.value = "Add your ${state.providerNames.getOrElse(state.active) { "" }} API key in Settings."
             return
         }
+        if (!online.value) {
+            userMessage.value = OFFLINE
+            return
+        }
         // Cleared first: a reply can fail before submit returns, and its
         // message only comes back into an empty input.
         val sent = draft
         draft = TextFieldValue()
-        if (!session.submit(sent.text)) draft = sent
+        if (session.submit(sent.text)) keepAlive.replyStarted() else draft = sent
+    }
+
+    /** The screen has asked for notification permission (whatever the answer). */
+    fun notificationsAsked() {
+        viewModelScope.launch { settingsRepository.markNotificationsAsked() }
     }
 
     fun stop() = session.cancel()
@@ -111,9 +140,13 @@ class ChatViewModel @Inject constructor(
             userMessage.value = "Add your ${state.providerNames.getOrElse(state.active) { "" }} API key in Settings."
             return
         }
+        if (!online.value) {
+            userMessage.value = OFFLINE
+            return
+        }
         val before = draft
         if (draft.text.trim() == question.text) draft = TextFieldValue()
-        if (!session.submit(question.text)) draft = before
+        if (session.submit(question.text)) keepAlive.replyStarted() else draft = before
     }
 
     /** Shows the previous message sent; false if there is none. */
@@ -165,5 +198,9 @@ class ChatViewModel @Inject constructor(
 
     fun userMessageShown() {
         userMessage.value = null
+    }
+
+    private companion object {
+        const val OFFLINE = "You're offline."
     }
 }
