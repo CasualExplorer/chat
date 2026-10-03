@@ -32,7 +32,7 @@ There are no environment variables on Android, so the app opens on Settings unti
 
 A reply that fails or is stopped stays in the chat, ending in an ERROR banner with the reason, or "Canceled". Any text that arrived is kept and sent with later turns. If none arrived, the message is left out of later requests and put back in the input to resend.
 
-Conversations are kept in memory only (in the ViewModel, so they survive rotation but not the process). Nothing is saved to disk, and OpenAI requests use `store: false`. Long conversations are compacted server-side: Anthropic past its 150k-token default, OpenAI past 200k, with a note under the reply when it happens. Anthropic requests use automatic prompt caching (top-level `cache_control`), and OpenAI requests share one `prompt_cache_key` per session.
+Conversations are saved on the device in a Room database (`app/.../data/db/`), unlike the terminal app, which keeps them in memory. Each reply is saved with what its provider returned (Anthropic thinking blocks, OpenAI encrypted reasoning), so continuing a conversation after a restart sends exactly what the terminal app would within one run. A streaming reply is saved about once a second, and one the app was closed during is marked "Interrupted" on the next start, by the same rules as a failed reply. The app opens the most recent conversation; New chat starts another and keeps the old one. Nothing is stored server-side: OpenAI requests use `store: false`. Long conversations are compacted server-side: Anthropic past its 150k-token default, OpenAI past 200k, with a note under the reply when it happens. Anthropic requests use automatic prompt caching (top-level `cache_control`), and OpenAI requests share one `prompt_cache_key` per session.
 
 ## Layout
 
@@ -43,7 +43,8 @@ Conversations are kept in memory only (in the ViewModel, so they survive rotatio
 | `core/.../AnthropicProvider.kt` | `anthropic.go`: Messages API request, SSE accumulator, replay, model listing and effort limits. |
 | `core/.../OpenAIProvider.kt` | `openai.go`: Responses API request, events, replay items, model filter. |
 | `core/.../Http.kt` | OkHttp transport, the SDKs' retry policy, the SSE parser and cancellation. |
-| `core/.../ChatSession.kt` | Conversation state and the send / fail / switch logic of `ui.go` and `messages.go`. |
+| `core/.../ChatSession.kt` | Conversation state and the send / fail / switch logic of `ui.go` and `messages.go`, over a `ConversationStore`. |
+| `core/.../ConversationStore.kt` | Where conversations are kept: the interface, its records, and an in-memory store for tests. |
 | `core/.../PromptHistory.kt` | `history.go`'s prompt history. |
 | `core/.../markdown/` | `markdown_stream.go`'s stable-prefix cache over a small block and inline parser, plus the code highlighter. |
 | `app/` | The Compose UI, settings and ViewModel. |

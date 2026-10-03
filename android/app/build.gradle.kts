@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     alias(libs.plugins.roborazzi)
+    alias(libs.plugins.room)
 }
 
 android {
@@ -55,6 +56,16 @@ android {
     }
 }
 
+room {
+    // One schema file per database version, checked in, for migrations.
+    // CI commits the file when it changes.
+    schemaDirectory("$projectDir/schemas")
+}
+
+ksp {
+    arg("room.generateKotlin", "true")
+}
+
 dependencies {
     implementation(project(":core"))
     implementation(platform(libs.compose.bom))
@@ -66,6 +77,9 @@ dependencies {
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.datastore.preferences)
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
     // Only to read the API keys the app stored with it before (LegacySecretsMigration).
     implementation(libs.security.crypto)
     implementation(libs.kotlinx.coroutines.android)

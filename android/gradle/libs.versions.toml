@@ -9,6 +9,7 @@ composeBom = "2026.09.00"
 activityCompose = "1.13.0"
 lifecycle = "2.11.0"
 datastore = "1.2.1"
+room = "2.8.5"
 hilt = "2.60.1"
 securityCrypto = "1.1.0-alpha06"
 json = "20250517"
@@ -34,6 +35,9 @@ activity-compose = { module = "androidx.activity:activity-compose", version.ref 
 lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
 datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
+room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
+room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
+room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 security-crypto = { module = "androidx.security:security-crypto", version.ref = "securityCrypto" }
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
 hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
@@ -50,3 +54,4 @@ kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }
+room = { id = "androidx.room", version.ref = "room" }
