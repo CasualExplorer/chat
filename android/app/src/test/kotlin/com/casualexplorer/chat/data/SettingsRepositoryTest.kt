@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -50,31 +51,33 @@ class SettingsRepositoryTest {
     ): DataStore<Preferences> =
         PreferenceDataStoreFactory.create(migrations = migrations, scope = backgroundScope, produceFile = { file })
 
+    private fun TestScope.repository(store: DataStore<Preferences>) = DataStoreSettingsRepository(store, FakeCipher(), UnconfinedTestDispatcher(testScheduler))
+
     /** What is stored, by key name. */
     private suspend fun DataStore<Preferences>.raw(): Map<String, Any> = data.first().asMap().mapKeys { it.key.name }
 
     @Test
     fun emptyStoreGivesTheTerminalAppsDefaults() = runTest {
-        assertEquals(UserSettings(), DataStoreSettingsRepository(store(), FakeCipher()).settings.first())
+        assertEquals(UserSettings(), repository(store()).settings.first())
     }
 
     @Test
     fun keysAreStoredEncryptedAndReadBack() = runTest {
         val store = store()
-        val repo = DataStoreSettingsRepository(store, FakeCipher())
-        repo.setApiKey(0, " sk-ant ")
-        repo.setApiKey(1, "sk-oa")
-        repo.setBaseUrl(0, "https://gateway.example/anthropic/")
-        repo.setActiveProvider(0)
-        repo.setModel(0, "claude-opus-5-5")
-        repo.setEffort(1, "max")
+        val repo = repository(store)
+        repo.setApiKey(ApiProvider.Anthropic, " sk-ant ")
+        repo.setApiKey(ApiProvider.OpenAI, "sk-oa")
+        repo.setBaseUrl(ApiProvider.Anthropic, "https://gateway.example/anthropic/")
+        repo.setActiveProvider(ApiProvider.Anthropic)
+        repo.setModel(ApiProvider.Anthropic, "claude-opus-5-5")
+        repo.setEffort(ApiProvider.OpenAI, "max")
         repo.setTheme(ThemeMode.Dark)
         repo.setDynamicColor(false)
         val read = repo.settings.first()
         assertEquals("sk-ant", read.anthropicKey)
         assertEquals("sk-oa", read.openaiKey)
         assertEquals("https://gateway.example/anthropic", read.anthropicBaseUrl)
-        assertEquals(0, read.activeIndex)
+        assertEquals(ApiProvider.Anthropic, read.activeProvider)
         assertEquals("claude-opus-5-5", read.anthropicModel)
         assertEquals("max", read.openaiEffort)
         assertEquals(ThemeMode.Dark, read.theme)
@@ -89,7 +92,7 @@ class SettingsRepositoryTest {
     fun aKeyThatCanNoLongerBeDecryptedReadsAsEmpty() = runTest {
         val store = store()
         store.updateData { it.toMutablePreferences().apply { this[Keys.OPENAI_KEY] = "written by a lost keystore key" } }
-        assertEquals("", DataStoreSettingsRepository(store, FakeCipher()).settings.first().openaiKey)
+        assertEquals("", repository(store).settings.first().openaiKey)
     }
 
     @Test
@@ -106,9 +109,9 @@ class SettingsRepositoryTest {
             cipher = FakeCipher(),
         )
         val store = store(migrations = listOf(SharedPreferencesMigration(context, LEGACY_SETTINGS_PREFS), secrets))
-        val read = DataStoreSettingsRepository(store, FakeCipher()).settings.first()
+        val read = repository(store).settings.first()
 
-        assertEquals(UserSettings.ANTHROPIC, read.activeProvider)
+        assertEquals(ApiProvider.Anthropic, read.activeProvider)
         assertEquals("gpt-6-astra", read.openaiModel)
         assertEquals("high", read.anthropicEffort)
         assertEquals("sk-ant-old", read.anthropicKey)
@@ -124,12 +127,12 @@ class SettingsRepositoryTest {
 
     @Test
     fun invalidValuesAreNotSaved() = runTest {
-        val repo = DataStoreSettingsRepository(store(), FakeCipher())
-        repo.setBaseUrl(1, "https://ok.example")
-        repo.setEffort(0, "huge")
-        repo.setModel(1, " ")
+        val repo = repository(store())
+        repo.setBaseUrl(ApiProvider.OpenAI, "https://ok.example")
+        repo.setEffort(ApiProvider.Anthropic, "huge")
+        repo.setModel(ApiProvider.OpenAI, " ")
         // Typed on the way to a valid address: the last valid one stays.
-        repo.setBaseUrl(1, "ftp://x")
+        repo.setBaseUrl(ApiProvider.OpenAI, "ftp://x")
         val read = repo.settings.first()
         assertEquals(UserSettings.DEFAULT_EFFORT, read.anthropicEffort)
         assertEquals(UserSettings.DEFAULT_OPENAI_MODEL, read.openaiModel)
@@ -147,8 +150,8 @@ class SettingsRepositoryTest {
                 this[Keys.OPENAI_BASE_URL] = "ftp://x"
             }
         }
-        val read = DataStoreSettingsRepository(store, FakeCipher()).settings.first()
-        assertEquals(UserSettings.OPENAI, read.activeProvider)
+        val read = repository(store).settings.first()
+        assertEquals(ApiProvider.OpenAI, read.activeProvider)
         assertEquals(UserSettings.DEFAULT_EFFORT, read.anthropicEffort)
         assertEquals(UserSettings.DEFAULT_OPENAI_MODEL, read.openaiModel)
         assertEquals("", read.openaiBaseUrl)
@@ -156,9 +159,9 @@ class SettingsRepositoryTest {
 
     @Test
     fun clearingAKeyStoresItEmpty() = runTest {
-        val repo = DataStoreSettingsRepository(store(), FakeCipher())
-        repo.setApiKey(1, "sk-oa")
-        repo.setApiKey(1, "")
+        val repo = repository(store())
+        repo.setApiKey(ApiProvider.OpenAI, "sk-oa")
+        repo.setApiKey(ApiProvider.OpenAI, "")
         assertEquals("", repo.settings.first().openaiKey)
     }
 

@@ -9,12 +9,9 @@ import com.casualexplorer.chat.core.ModelInfo
 import com.casualexplorer.chat.core.Provider
 import com.casualexplorer.chat.core.StreamEvent
 import com.casualexplorer.chat.core.Turn
-import com.casualexplorer.chat.data.ChatRepository
-import com.casualexplorer.chat.data.UserSettings
+import com.casualexplorer.chat.testing.TestChatRepository
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
@@ -37,14 +34,6 @@ class StopReplyOnLeaveTest {
         override suspend fun listModels() = emptyList<ModelInfo>()
     }
 
-    private class Repository(override val session: ChatSession) : ChatRepository {
-        override val settings: StateFlow<UserSettings?> = MutableStateFlow(UserSettings())
-
-        override fun selectModel(provider: Int, model: String) = true
-
-        override fun selectEffort(effort: String) = true
-    }
-
     private val owner = object : LifecycleOwner {
         override val lifecycle: Lifecycle get() = error("not used")
     }
@@ -55,7 +44,7 @@ class StopReplyOnLeaveTest {
         assertTrue(session.submit("hi"))
         session.state.first { s -> (s.messages.lastOrNull() as? AssistantMessage)?.text == "Hel" }
 
-        StopReplyOnLeave { Repository(session) }.onStop(owner)
+        StopReplyOnLeave { TestChatRepository(session) }.onStop(owner)
 
         val ended = session.state.first { !it.streaming && (it.messages.last() as? AssistantMessage)?.pending == false }
         val reply = ended.messages.last() as AssistantMessage
@@ -66,7 +55,7 @@ class StopReplyOnLeaveTest {
     @Test
     fun leavingWithNoReplyStreamingDoesNothing() = runTest {
         val session = ChatSession(listOf(SlowProvider()), 0, InMemoryConversationStore(), backgroundScope, debounceMs = 0)
-        StopReplyOnLeave { Repository(session) }.onStop(owner)
+        StopReplyOnLeave { TestChatRepository(session) }.onStop(owner)
         assertEquals(false, session.state.value.streaming)
     }
 }

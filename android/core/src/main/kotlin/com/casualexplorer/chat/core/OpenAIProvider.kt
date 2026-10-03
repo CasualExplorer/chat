@@ -1,5 +1,7 @@
 package com.casualexplorer.chat.core
 
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.channelFlow
@@ -21,18 +23,20 @@ class OpenAIProvider(
     override var model: String,
     override var effort: String,
     private val apiKey: () -> String,
-    /** Where the API is served; [OPENAI_BASE_URL] unless set otherwise. */
-    @Volatile var baseUrl: String = OPENAI_BASE_URL,
+    /** Where the API is served, read for each request; [OPENAI_BASE_URL] unless set otherwise. */
+    private val baseUrlOf: () -> String = { OPENAI_BASE_URL },
     client: OkHttpClient = defaultHttpClient,
     // The OpenAI SDK doesn't wait for a retry-after past two minutes.
     retry: RetryPolicy = RetryPolicy(maxRetryAfterMs = 120_000),
+    /** Where response bodies are read, which blocks. */
+    ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : Provider {
     override val name = "OpenAI"
 
     /** Routes this session's requests to the same prompt cache. */
     val cacheKey = "chat-" + randomText()
 
-    private val http = Http(name, "x-request-id", client, retry)
+    private val http = Http(name, "x-request-id", client, retry, ioDispatcher)
 
     private fun headers() = mapOf("Authorization" to "Bearer ${apiKey()}")
 
@@ -42,7 +46,7 @@ class OpenAIProvider(
      * models, and doesn't report context windows or effort levels.
      */
     override suspend fun listModels(): List<ModelInfo> {
-        val data = http.getJson("$baseUrl/v1/models", headers()).optJSONArray("data") ?: JSONArray()
+        val data = http.getJson("${baseUrlOf()}/v1/models", headers()).optJSONArray("data") ?: JSONArray()
         val today = LocalDate.now()
         val found = (0 until data.length()).map { data.getJSONObject(it) }.filter {
             isOpenAIChatModel(it.optString("id"), shutdownDate(it), today)
@@ -73,7 +77,7 @@ class OpenAIProvider(
             var final: JSONObject? = null
             var note = ""
             var thought = false // a reasoning summary has been streamed
-            http.postSse("$baseUrl/v1/responses", headers(), body) { sse ->
+            http.postSse("${baseUrlOf()}/v1/responses", headers(), body) { sse ->
                 if (sse.data == "[DONE]") return@postSse
                 val event = JSONObject(sse.data)
                 when (event.optString("type")) {
@@ -97,7 +101,11 @@ class OpenAIProvider(
                         val e = event.optJSONObject("response")?.optJSONObject("error")
                         val message = e?.optString("message").orEmpty()
                         val code = e?.optString("code").orEmpty()
-                        if (message.isNotEmpty()) msg += ": $message" else if (code.isNotEmpty()) msg += ": $code"
+                        if (message.isNotEmpty()) {
+                            msg += ": $message"
+                        } else if (code.isNotEmpty()) {
+                            msg += ": $code"
+                        }
                         throw StreamError(msg)
                     }
                     "error" -> throw StreamError("OpenAI stream error: " + event.optString("message"))

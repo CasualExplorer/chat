@@ -14,43 +14,28 @@ import com.casualexplorer.chat.core.Role
 import com.casualexplorer.chat.core.StreamError
 import com.casualexplorer.chat.core.StreamEvent
 import com.casualexplorer.chat.core.Turn
-import com.casualexplorer.chat.data.ChatRepository
-import com.casualexplorer.chat.data.NetworkMonitor
+import com.casualexplorer.chat.data.ApiProvider
 import com.casualexplorer.chat.data.UserSettings
+import com.casualexplorer.chat.testing.MainDispatcherRule
+import com.casualexplorer.chat.testing.TestChatRepository
+import com.casualexplorer.chat.testing.TestNetworkMonitor
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.test.TestDispatcher
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TestWatcher
-import org.junit.runner.Description
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-
-/** Sets the main dispatcher, which viewModelScope uses, for each test. */
-@OptIn(ExperimentalCoroutinesApi::class)
-class MainDispatcherRule(val dispatcher: TestDispatcher = UnconfinedTestDispatcher()) : TestWatcher() {
-    override fun starting(description: Description) = Dispatchers.setMain(dispatcher)
-
-    override fun finished(description: Description) = Dispatchers.resetMain()
-}
 
 /** Replies with [script]; waits for [gate] first, if set, and hangs at the end if [hang]. */
 private class ScriptedProvider(
@@ -72,31 +57,20 @@ private class ScriptedProvider(
     override suspend fun listModels() = emptyList<ModelInfo>()
 }
 
-private class FakeChatRepository(override val session: ChatSession, override val settings: StateFlow<UserSettings?>) : ChatRepository {
-    override fun selectModel(provider: Int, model: String) = session.selectModel(provider, model) == null
-
-    override fun selectEffort(effort: String) = session.selectEffort(effort) == null
-}
-
-private class FakeNetworkMonitor : NetworkMonitor {
-    val online = MutableStateFlow(true)
-    override val isOnline: Flow<Boolean> = online
-}
-
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], application = Application::class)
 class ChatViewModelTest {
     @get:Rule
     val main = MainDispatcherRule()
 
-    private val withKey = UserSettings(anthropicKey = "k", activeProvider = UserSettings.ANTHROPIC)
+    private val withKey = UserSettings(anthropicKey = "k", activeProvider = ApiProvider.Anthropic)
 
-    private val network = FakeNetworkMonitor()
+    private val network = TestNetworkMonitor()
 
     private fun CoroutineScope.viewModel(provider: Provider, settings: UserSettings = withKey): ChatViewModel {
         val session = ChatSession(listOf(provider), 0, InMemoryConversationStore(), this, debounceMs = 0)
         val flow = MutableStateFlow<UserSettings?>(settings)
-        return ChatViewModel(FakeChatRepository(session, flow), network, SavedStateHandle())
+        return ChatViewModel(TestChatRepository(session, flow), network, SavedStateHandle())
     }
 
     private suspend fun ChatViewModel.awaitReply(count: Int = 2): AssistantMessage = uiState.first { s ->
@@ -160,7 +134,7 @@ class ChatViewModelTest {
         vm.type("hi")
         vm.send()
         vm.uiState.first { it.chat.streaming }
-        vm.selectModel(0, "other")
+        vm.selectModel(ApiProvider.Anthropic, "other")
         assertEquals(SnackbarMessage(R.string.wait_switch_model), vm.uiState.first { it.userMessage != null }.userMessage)
         vm.stop()
         assertTrue(vm.awaitReply().canceled)

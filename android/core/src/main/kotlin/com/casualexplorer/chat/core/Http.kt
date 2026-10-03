@@ -1,6 +1,6 @@
 package com.casualexplorer.chat.core
 
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -142,6 +142,8 @@ internal class Http(
     private val requestIdHeader: String,
     private val client: OkHttpClient,
     private val retry: RetryPolicy,
+    /** Where bodies are read; the read blocks. */
+    private val ioDispatcher: CoroutineDispatcher,
 ) {
     /** Sends [body] and calls [onEvent] for each server-sent event of the reply. */
     suspend fun postSse(
@@ -190,14 +192,14 @@ internal class Http(
     }
 
     /**
-     * Reads the body on the IO dispatcher. A blocked read doesn't notice
+     * Reads the body on [ioDispatcher]. A blocked read doesn't notice
      * cancellation, so cancelling the caller cancels the call, which fails
      * the read.
      */
     private suspend fun <T> readBody(call: Call, response: Response, read: suspend (Response) -> T): T =
         response.use {
             coroutineScope {
-                val reading = async(Dispatchers.IO) {
+                val reading = async(ioDispatcher) {
                     try {
                         read(response)
                     } catch (e: IOException) {

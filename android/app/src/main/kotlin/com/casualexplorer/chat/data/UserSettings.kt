@@ -13,8 +13,7 @@ data class UserSettings(
     val anthropicBaseUrl: String = "",
     /** Blank for the official API. */
     val openaiBaseUrl: String = "",
-    /** [ANTHROPIC] or [OPENAI]. */
-    val activeProvider: String = OPENAI,
+    val activeProvider: ApiProvider = ApiProvider.OpenAI,
     val anthropicModel: String = DEFAULT_ANTHROPIC_MODEL,
     val openaiModel: String = DEFAULT_OPENAI_MODEL,
     val anthropicEffort: String = DEFAULT_EFFORT,
@@ -23,18 +22,54 @@ data class UserSettings(
     /** Material You colours from the wallpaper, on Android 12 and later. */
     val dynamicColor: Boolean = true,
 ) {
-    /** Whether provider [index] (0 Anthropic, 1 OpenAI) has a key. */
-    fun hasKey(index: Int) = if (index == 0) anthropicKey.isNotEmpty() else openaiKey.isNotEmpty()
+    fun hasKey(provider: ApiProvider) = key(provider).isNotEmpty()
 
-    /** The index of the provider in use (0 Anthropic, 1 OpenAI). */
-    val activeIndex: Int get() = if (activeProvider == ANTHROPIC) 0 else 1
+    /** Whether either provider has a key. */
+    val hasAnyKey: Boolean get() = ApiProvider.entries.any { hasKey(it) }
+
+    fun key(provider: ApiProvider) = when (provider) {
+        ApiProvider.Anthropic -> anthropicKey
+        ApiProvider.OpenAI -> openaiKey
+    }
+
+    /** The provider's server; blank for the official API. */
+    fun baseUrl(provider: ApiProvider) = when (provider) {
+        ApiProvider.Anthropic -> anthropicBaseUrl
+        ApiProvider.OpenAI -> openaiBaseUrl
+    }
+
+    fun model(provider: ApiProvider) = when (provider) {
+        ApiProvider.Anthropic -> anthropicModel
+        ApiProvider.OpenAI -> openaiModel
+    }
+
+    fun effort(provider: ApiProvider) = when (provider) {
+        ApiProvider.Anthropic -> anthropicEffort
+        ApiProvider.OpenAI -> openaiEffort
+    }
 
     companion object {
-        const val ANTHROPIC = "anthropic"
-        const val OPENAI = "openai"
         const val DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-5-5"
         const val DEFAULT_OPENAI_MODEL = "gpt-5.6-luna"
         const val DEFAULT_EFFORT = "medium"
+    }
+}
+
+/**
+ * The APIs the app talks to. [index] is the provider's place in the chat
+ * session's list (ChatState.active, ModelChoice.provider); [storedName] is
+ * how the settings store it.
+ */
+enum class ApiProvider(val index: Int, val storedName: String) {
+    Anthropic(0, "anthropic"),
+    OpenAI(1, "openai"),
+    ;
+
+    companion object {
+        /** The provider at [index] in the chat session's list. */
+        fun fromIndex(index: Int): ApiProvider = entries.first { it.index == index }
+
+        fun fromStoredName(name: String?): ApiProvider? = entries.firstOrNull { it.storedName == name }
     }
 }
 

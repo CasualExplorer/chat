@@ -47,6 +47,9 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      - name: Check formatting
+        run: ./gradlew --no-daemon spotlessCheck
+
       - name: Lint
         run: ./gradlew --no-daemon lint
 
@@ -92,6 +95,11 @@ jobs:
 
       - name: Build debug APK
         run: ./gradlew --no-daemon assembleDebug
+
+      # The release build runs R8, which fails on missing keep rules; it is
+      # unsigned, so only built, not uploaded.
+      - name: Build release APK
+        run: ./gradlew --no-daemon assembleRelease
 
       # Room writes the database schema to app/schemas when it compiles, and
       # those files belong in the repository for future migrations.

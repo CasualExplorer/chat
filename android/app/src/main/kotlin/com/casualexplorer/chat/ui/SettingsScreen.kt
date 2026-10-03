@@ -46,20 +46,26 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.casualexplorer.chat.R
 import com.casualexplorer.chat.core.ANTHROPIC_BASE_URL
 import com.casualexplorer.chat.core.OPENAI_BASE_URL
+import com.casualexplorer.chat.data.ApiProvider
 import com.casualexplorer.chat.data.ThemeMode
 import com.casualexplorer.chat.data.UserSettings
 import com.casualexplorer.chat.data.normalizeBaseUrl
 
 /** The settings screen, connected to [vm]. [onDone] leaves it. */
 @Composable
-fun SettingsRoute(vm: SettingsViewModel, onDone: () -> Unit) {
+fun SettingsRoute(
+    onDone: () -> Unit,
+    modifier: Modifier = Modifier,
+    vm: SettingsViewModel = hiltViewModel(),
+) {
     when (val state = vm.uiState.collectAsStateWithLifecycle().value) {
         // The settings load in moments; the screen waits for them.
-        SettingsUiState.Loading -> Box(Modifier.fillMaxSize())
+        SettingsUiState.Loading -> Box(modifier.fillMaxSize())
         is SettingsUiState.Loaded -> SettingsScreen(
             settings = state.settings,
             text = vm.text,
@@ -68,6 +74,7 @@ fun SettingsRoute(vm: SettingsViewModel, onDone: () -> Unit) {
             onThemeChange = vm::setTheme,
             onDynamicColorChange = vm::setDynamicColor,
             onBack = onDone,
+            modifier = modifier,
         )
     }
 }
@@ -83,15 +90,17 @@ fun SettingsRoute(vm: SettingsViewModel, onDone: () -> Unit) {
 fun SettingsScreen(
     settings: UserSettings,
     text: SettingsText,
-    onApiKeyChange: (provider: Int, key: String) -> Unit,
-    onBaseUrlChange: (provider: Int, url: String) -> Unit,
+    onApiKeyChange: (provider: ApiProvider, key: String) -> Unit,
+    onBaseUrlChange: (provider: ApiProvider, url: String) -> Unit,
     onThemeChange: (ThemeMode) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
     onBack: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var showKeys by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
+        modifier = modifier,
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.settings)) },
@@ -115,8 +124,8 @@ fun SettingsScreen(
         ) {
             Section(stringResource(R.string.api_keys))
             Note(stringResource(R.string.api_keys_note))
-            SecretField(stringResource(R.string.anthropic_key), text.anthropicKey, showKeys) { onApiKeyChange(0, it) }
-            SecretField(stringResource(R.string.openai_key), text.openaiKey, showKeys) { onApiKeyChange(1, it) }
+            SecretField(stringResource(R.string.anthropic_key), text.anthropicKey, showKeys) { onApiKeyChange(ApiProvider.Anthropic, it) }
+            SecretField(stringResource(R.string.openai_key), text.openaiKey, showKeys) { onApiKeyChange(ApiProvider.OpenAI, it) }
             SwitchRow(stringResource(R.string.show_keys), null, showKeys) { showKeys = it }
 
             HorizontalDivider()
@@ -147,8 +156,8 @@ fun SettingsScreen(
             HorizontalDivider()
             Section(stringResource(R.string.servers))
             Note(stringResource(R.string.servers_note))
-            UrlField(stringResource(R.string.anthropic_server), text.anthropicBaseUrl, ANTHROPIC_BASE_URL) { onBaseUrlChange(0, it) }
-            UrlField(stringResource(R.string.openai_server), text.openaiBaseUrl, OPENAI_BASE_URL) { onBaseUrlChange(1, it) }
+            UrlField(stringResource(R.string.anthropic_server), text.anthropicBaseUrl, ANTHROPIC_BASE_URL) { onBaseUrlChange(ApiProvider.Anthropic, it) }
+            UrlField(stringResource(R.string.openai_server), text.openaiBaseUrl, OPENAI_BASE_URL) { onBaseUrlChange(ApiProvider.OpenAI, it) }
 
             HorizontalDivider()
             Note(stringResource(R.string.privacy_note))
@@ -172,7 +181,11 @@ private fun Note(text: String) =
 /** A row with a switch, all of it toggling. */
 @Composable
 private fun SwitchRow(title: String, note: String?, checked: Boolean, onChange: (Boolean) -> Unit) {
-    val supporting: (@Composable () -> Unit)? = if (note == null) null else { { Text(note) } }
+    val supporting: (@Composable () -> Unit)? = if (note == null) {
+        null
+    } else {
+        { Text(note) }
+    }
     ListItem(
         headlineContent = { Text(title) },
         supportingContent = supporting,

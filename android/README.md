@@ -8,14 +8,16 @@ JDK 21 (Robolectric needs it for SDK 36; the app compiles to Java 17) and the An
 
 ```sh
 cd android
+./gradlew spotlessCheck           # formatting (ktlint, rules in .editorconfig); spotlessApply fixes it
 ./gradlew lint                    # Android lint
 ./gradlew test                    # unit tests: core/ on the JVM, app/ on Robolectric
 ./gradlew verifyRoborazziDebug    # screenshot tests against app/src/test/screenshots
 ./gradlew recordRoborazziDebug    # re-record those references
 ./gradlew assembleDebug           # app/build/outputs/apk/debug/app-debug.apk
+./gradlew assembleRelease         # unsigned release build, shrunk by R8
 ```
 
-CI (`.github/workflows/android.yml`) runs lint, the screenshot tests, the unit tests and the debug build. It uploads the APK (`chat-debug-apk`), the screenshots (`screenshots`) and the lint and test reports (`reports`). When there are no reference screenshots yet, or a manual run sets `record_screenshots`, CI records them and commits them to the branch instead of verifying them.
+CI (`.github/workflows/android.yml`) runs the formatting check, lint, the screenshot tests, the unit tests, and the debug and release builds. It uploads the APK (`chat-debug-apk`), the screenshots (`screenshots`) and the lint and test reports (`reports`). When there are no reference screenshots yet, or a manual run sets `record_screenshots`, CI records them and commits them to the branch instead of verifying them.
 
 ## Setup
 
@@ -54,9 +56,9 @@ Conversations are saved on the device in a Room database (`app/.../data/db/`), u
 | `core/.../ConversationStore.kt` | Where conversations are kept: the interface, its records, and an in-memory store for tests. |
 | `core/.../PromptHistory.kt` | `history.go`'s prompt history. |
 | `core/.../markdown/` | `markdown_stream.go`'s stable-prefix cache over a small block and inline parser, plus the code highlighter. |
-| `app/.../data/` | Repositories: the chat (`ChatRepository`, which holds the providers and the session for the life of the process), settings in DataStore, the Room store, the network monitor. |
-| `app/.../di/` | Hilt modules. |
-| `app/.../ui/` | Compose screens and their ViewModels. `ChatApp.kt` is the Navigation 3 back stack; each screen has a `…Route` that connects its ViewModel and a stateless `…Screen` that takes an immutable UI state and callbacks. |
+| `app/.../data/` | Repositories: the chat (`ChatRepository`, which exposes the conversation as a `StateFlow` and its actions; it holds the providers and the session for the life of the process), settings in DataStore, the Room store, the network monitor. |
+| `app/.../di/` | Hilt modules, including the application scope and the injected dispatchers. |
+| `app/.../ui/` | Compose screens and their ViewModels. `ChatApp.kt` is the Navigation 3 back stack; each screen has a `…Route` that gets its ViewModel with `hiltViewModel()`, scoped to its back stack entry, and a stateless `…Screen` that takes an immutable UI state and callbacks. `MainActivityViewModel` holds the theme and the launch screen. |
 
 The markdown renderer caches the parsed blocks of the stable prefix. While a reply streams, only the paragraph still arriving is re-parsed, and the earlier blocks stay the same instances, so Compose skips redrawing them.
 

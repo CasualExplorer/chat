@@ -184,8 +184,10 @@ class ProviderTest {
     @Test
     fun coalesceMergesTextAndKeepsOrder() = runBlocking {
         val events = flowOf(
-            StreamEvent.Thinking("a"), StreamEvent.Thinking("b"),
-            StreamEvent.Delta("c"), StreamEvent.Delta("d"),
+            StreamEvent.Thinking("a"),
+            StreamEvent.Thinking("b"),
+            StreamEvent.Delta("c"),
+            StreamEvent.Delta("d"),
             StreamEvent.Thinking("e"),
             StreamEvent.Done(Turn(Role.Assistant, "cd")),
         )

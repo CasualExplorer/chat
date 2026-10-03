@@ -89,7 +89,7 @@ class RequestTest {
     @Test
     fun anthropicRequest() {
         val (url, captured) = captureServer()
-        val p = AnthropicProvider("claude-test", "high", { "k" }, url)
+        val p = AnthropicProvider("claude-test", "high", { "k" }, { url })
 
         val err = drain(p.stream(listOf(Turn(Role.User, "hi")))) ?: fail("expected the stub's error")
         assertEquals("Anthropic API error 400 (invalid_request_error): nope [request req_test]", describeError(err))
@@ -117,7 +117,7 @@ class RequestTest {
     @Test
     fun openAIRequest() {
         val (url, captured) = captureServer()
-        val p = OpenAIProvider("gpt-test", "low", { "k" }, url)
+        val p = OpenAIProvider("gpt-test", "low", { "k" }, { url })
 
         val err = drain(p.stream(listOf(Turn(Role.User, "hi")))) ?: fail("expected the stub's error")
         assertEquals("OpenAI API error 400: nope [request req_test]", describeError(err))
@@ -141,7 +141,7 @@ class RequestTest {
     @Test
     fun unauthorizedNamesTheKeySetting() {
         val url = server { it.respond(401, """{"error": {"type": "authentication_error", "message": "invalid x-api-key"}}""") }
-        val err = drain(AnthropicProvider("m", "low", { "bad" }, url).stream(listOf(Turn(Role.User, "hi"))))!!
+        val err = drain(AnthropicProvider("m", "low", { "bad" }, { url }).stream(listOf(Turn(Role.User, "hi"))))!!
         assertEquals(
             "Anthropic API error 401 (authentication_error): invalid x-api-key (check the Anthropic API key in Settings)",
             describeError(err),
@@ -178,7 +178,7 @@ class RequestTest {
             ex.respond(400, """{"type": "error", "error": {"type": "invalid_request_error", "message": "nope"}}""")
         }
 
-        val p = AnthropicProvider("claude-sonnet-4-6", "max", { "k" }, url)
+        val p = AnthropicProvider("claude-sonnet-4-6", "max", { "k" }, { url })
         val models = runBlocking { p.listModels() }
         assertEquals(listOf(ModelInfo("claude-sonnet-4-6", 200000)), models, "want only claude-sonnet-4-6")
         assertEquals("high", p.requestEffort, "max lowered to high")
@@ -203,7 +203,7 @@ class RequestTest {
             val id = if (after) "claude-opus-5-5" else "claude-sonnet-5-5"
             ex.respond(200, """{"has_more": ${!after}, "last_id": "a", "data": [{"id": "$id", "max_input_tokens": 1000000, "capabilities": $caps}]}""")
         }
-        val models = runBlocking { AnthropicProvider("m", "high", { "k" }, url).listModels() }
+        val models = runBlocking { AnthropicProvider("m", "high", { "k" }, { url }).listModels() }
         assertEquals(listOf("claude-sonnet-5-5", "claude-opus-5-5"), models.map { it.id })
     }
 
@@ -247,7 +247,7 @@ class RequestTest {
                 "text/event-stream",
             )
         }
-        val events = runBlocking { AnthropicProvider("m", "high", { "k" }, url).stream(listOf(Turn(Role.User, "hi"))).toList() }
+        val events = runBlocking { AnthropicProvider("m", "high", { "k" }, { url }).stream(listOf(Turn(Role.User, "hi"))).toList() }
         val done = assertIs<StreamEvent.Done>(events.last())
         assertEquals(
             listOf("Pondering.", "\n\n", "More."),
@@ -285,7 +285,7 @@ class RequestTest {
                 "text/event-stream",
             )
         }
-        val err = drain(AnthropicProvider("m", "high", { "k" }, url).stream(listOf(Turn(Role.User, "hi"))))
+        val err = drain(AnthropicProvider("m", "high", { "k" }, { url }).stream(listOf(Turn(Role.User, "hi"))))
         assertEquals("Claude declined this request (cyber)", err?.let(::describeError))
     }
 
@@ -294,7 +294,7 @@ class RequestTest {
         val url = server { ex ->
             ex.respond(200, sse("error" to """{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}"""), "text/event-stream")
         }
-        val err = drain(AnthropicProvider("m", "high", { "k" }, url).stream(listOf(Turn(Role.User, "hi"))))
+        val err = drain(AnthropicProvider("m", "high", { "k" }, { url }).stream(listOf(Turn(Role.User, "hi"))))
         assertEquals("Anthropic stream error: Overloaded", err?.let(::describeError))
     }
 
@@ -320,7 +320,7 @@ class RequestTest {
                 "text/event-stream",
             )
         }
-        val events = runBlocking { OpenAIProvider("gpt", "low", { "k" }, url).stream(listOf(Turn(Role.User, "hi"))).toList() }
+        val events = runBlocking { OpenAIProvider("gpt", "low", { "k" }, { url }).stream(listOf(Turn(Role.User, "hi"))).toList() }
         assertEquals(listOf("Plan", "\n\n", "Act"), events.filterIsInstance<StreamEvent.Thinking>().map { it.text })
         val done = assertIs<StreamEvent.Done>(events.last())
         assertEquals("Hi!", done.turn.text)
@@ -340,7 +340,7 @@ class RequestTest {
                 "text/event-stream",
             )
         }
-        val err = drain(OpenAIProvider("gpt", "low", { "k" }, url).stream(listOf(Turn(Role.User, "hi"))))
+        val err = drain(OpenAIProvider("gpt", "low", { "k" }, { url }).stream(listOf(Turn(Role.User, "hi"))))
         assertEquals("OpenAI response failed: Boom", err?.let(::describeError))
     }
 
@@ -357,7 +357,7 @@ class RequestTest {
         // first() cancels the request once the first delta arrives; the read
         // blocked on the open connection must not hold it up.
         val first = withTimeout(5_000) {
-            OpenAIProvider("gpt", "low", { "k" }, url).stream(listOf(Turn(Role.User, "hi"))).first()
+            OpenAIProvider("gpt", "low", { "k" }, { url }).stream(listOf(Turn(Role.User, "hi"))).first()
         }
         assertEquals(StreamEvent.Delta("x"), first)
         assertTrue(System.currentTimeMillis() - started < 5_000)

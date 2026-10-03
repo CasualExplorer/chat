@@ -107,6 +107,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.window.core.layout.WindowSizeClass
 import com.casualexplorer.chat.R
@@ -119,11 +120,12 @@ import com.casualexplorer.chat.core.UserMessage
 import com.casualexplorer.chat.core.formatEffort
 import com.casualexplorer.chat.core.formatTokens
 import com.casualexplorer.chat.core.modelChoices
+import com.casualexplorer.chat.data.ApiProvider
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
-import kotlinx.coroutines.launch
 
 /** How wide the conversation gets on a large screen. */
 private val MAX_CONTENT_WIDTH = 840.dp
@@ -132,7 +134,11 @@ private val DRAWER_WIDTH = 300.dp
 
 /** The chat screen, connected to [vm]. */
 @Composable
-fun ChatRoute(vm: ChatViewModel, onOpenSettings: () -> Unit) {
+fun ChatRoute(
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier,
+    vm: ChatViewModel = hiltViewModel(),
+) {
     val uiState by vm.uiState.collectAsStateWithLifecycle()
     ChatScreen(
         uiState = uiState,
@@ -152,6 +158,7 @@ fun ChatRoute(vm: ChatViewModel, onOpenSettings: () -> Unit) {
         onToggleThinking = vm::toggleThinking,
         onUserMessageShown = vm::userMessageShown,
         onOpenSettings = onOpenSettings,
+        modifier = modifier,
     )
 }
 
@@ -171,7 +178,7 @@ fun ChatScreen(
     onHistoryPrevious: () -> Boolean,
     onHistoryNext: () -> Boolean,
     onHistoryEscape: () -> Boolean,
-    onSelectModel: (provider: Int, model: String) -> Unit,
+    onSelectModel: (provider: ApiProvider, model: String) -> Unit,
     onSelectEffort: (String) -> Unit,
     onNewChat: () -> Unit,
     onToggleThinking: (replyId: Long) -> Unit,
@@ -314,7 +321,7 @@ fun ChatScreen(
         ModelSheet(
             state,
             onSelectModel = {
-                onSelectModel(it.provider, it.model)
+                onSelectModel(ApiProvider.fromIndex(it.provider), it.model)
                 showModels = false
             },
             onSelectEffort = onSelectEffort,

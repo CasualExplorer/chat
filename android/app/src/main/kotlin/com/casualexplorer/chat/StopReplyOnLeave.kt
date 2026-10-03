@@ -12,6 +12,6 @@ import dagger.Lazy
  */
 class StopReplyOnLeave(private val chat: Lazy<ChatRepository>) : DefaultLifecycleObserver {
     override fun onStop(owner: LifecycleOwner) {
-        chat.get().session.cancel()
+        chat.get().cancel()
     }
 }

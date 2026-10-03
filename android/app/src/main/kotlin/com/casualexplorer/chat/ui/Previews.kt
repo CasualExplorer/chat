@@ -1,9 +1,10 @@
 package com.casualexplorer.chat.ui
 
-import android.content.res.Configuration
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.window.core.layout.WindowSizeClass
 import com.casualexplorer.chat.core.AssistantMessage
 import com.casualexplorer.chat.core.ChatState
 import com.casualexplorer.chat.core.ConversationSummary
@@ -104,14 +105,14 @@ internal fun ChatScreenSample(
         wide = wide,
     )
 
-@Preview(name = "Tablet", device = "spec:width=1280dp,height=800dp,dpi=240")
+@DevicePreviews
 @Composable
-private fun TabletPreview() = ChatTheme(dynamicColor = false) {
-    ChatScreenSample(SampleData.conversation, wide = true)
+private fun DevicesPreview() = ChatTheme(dynamicColor = false) {
+    val wide = currentWindowAdaptiveInfo().windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
+    ChatScreenSample(SampleData.conversation, wide = wide)
 }
 
-@Preview(name = "Light")
-@Preview(name = "Dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
+@ThemePreviews
 @Composable
 private fun ConversationPreview() = ChatTheme(dynamicColor = false) {
     ChatScreenSample(SampleData.conversation, input = "And in Rust?")
@@ -121,8 +122,7 @@ private fun ConversationPreview() = ChatTheme(dynamicColor = false) {
 @Composable
 private fun NoKeyPreview() = ChatTheme(dynamicColor = false) { ChatScreenSample(SampleData.noKey) }
 
-@Preview(name = "Settings, light")
-@Preview(name = "Settings, dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
+@ThemePreviews
 @Composable
 private fun SettingsPreview() = ChatTheme(dynamicColor = false) {
     SampleSettingsScreen()

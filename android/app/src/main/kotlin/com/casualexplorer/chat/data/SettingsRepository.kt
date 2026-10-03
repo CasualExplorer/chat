@@ -11,7 +11,9 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.casualexplorer.chat.core.EFFORTS
-import kotlinx.coroutines.Dispatchers
+import com.casualexplorer.chat.di.ChatDispatchers
+import com.casualexplorer.chat.di.Dispatcher
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
@@ -23,24 +25,23 @@ import javax.inject.Singleton
 /**
  * The app's settings, which stand in for the terminal app's environment
  * variables and flags. Each is saved as soon as it changes, as Now in
- * Android's user data is. Providers are numbered as in the chat: 0 is
- * Anthropic, 1 is OpenAI.
+ * Android's user data is.
  */
 interface SettingsRepository {
     val settings: Flow<UserSettings>
 
-    suspend fun setApiKey(provider: Int, key: String)
+    suspend fun setApiKey(provider: ApiProvider, key: String)
 
     /** Sets the provider's server; an address that isn't blank or http(s) is ignored. */
-    suspend fun setBaseUrl(provider: Int, url: String)
+    suspend fun setBaseUrl(provider: ApiProvider, url: String)
 
-    suspend fun setActiveProvider(provider: Int)
+    suspend fun setActiveProvider(provider: ApiProvider)
 
     /** Sets the provider's model; a blank one is ignored. */
-    suspend fun setModel(provider: Int, model: String)
+    suspend fun setModel(provider: ApiProvider, model: String)
 
     /** Sets the provider's reasoning effort; one not in [EFFORTS] is ignored. */
-    suspend fun setEffort(provider: Int, effort: String)
+    suspend fun setEffort(provider: ApiProvider, effort: String)
 
     suspend fun setTheme(theme: ThemeMode)
 
@@ -55,6 +56,7 @@ interface SettingsRepository {
 class DataStoreSettingsRepository @Inject constructor(
     private val dataStore: DataStore<Preferences>,
     private val cipher: KeyCipher,
+    @Dispatcher(ChatDispatchers.Default) defaultDispatcher: CoroutineDispatcher,
 ) : SettingsRepository {
     override val settings: Flow<UserSettings> = dataStore.data.map { p ->
         val defaults = UserSettings()
@@ -63,9 +65,7 @@ class DataStoreSettingsRepository @Inject constructor(
             openaiKey = p[Keys.OPENAI_KEY]?.let(cipher::decrypt).orEmpty(),
             anthropicBaseUrl = p[Keys.ANTHROPIC_BASE_URL]?.let(::normalizeBaseUrl).orEmpty(),
             openaiBaseUrl = p[Keys.OPENAI_BASE_URL]?.let(::normalizeBaseUrl).orEmpty(),
-            activeProvider = p[Keys.ACTIVE_PROVIDER]
-                ?.takeIf { it == UserSettings.ANTHROPIC || it == UserSettings.OPENAI }
-                ?: defaults.activeProvider,
+            activeProvider = ApiProvider.fromStoredName(p[Keys.ACTIVE_PROVIDER]) ?: defaults.activeProvider,
             anthropicModel = p[Keys.ANTHROPIC_MODEL]?.takeIf { it.isNotBlank() } ?: defaults.anthropicModel,
             openaiModel = p[Keys.OPENAI_MODEL]?.takeIf { it.isNotBlank() } ?: defaults.openaiModel,
             anthropicEffort = p[Keys.ANTHROPIC_EFFORT]?.takeIf { it in EFFORTS } ?: defaults.anthropicEffort,
@@ -75,31 +75,31 @@ class DataStoreSettingsRepository @Inject constructor(
         )
     }
         // Decrypting the keys reaches the keystore; not on the main thread.
-        .flowOn(Dispatchers.Default)
+        .flowOn(defaultDispatcher)
         .distinctUntilChanged()
 
-    override suspend fun setApiKey(provider: Int, key: String) {
+    override suspend fun setApiKey(provider: ApiProvider, key: String) {
         // Encrypted inside the edit, on DataStore's own thread: the keystore is slow.
-        dataStore.edit { it[if (provider == 0) Keys.ANTHROPIC_KEY else Keys.OPENAI_KEY] = cipher.encrypt(key.trim()) }
+        dataStore.edit { it[Keys.apiKey(provider)] = cipher.encrypt(key.trim()) }
     }
 
-    override suspend fun setBaseUrl(provider: Int, url: String) {
+    override suspend fun setBaseUrl(provider: ApiProvider, url: String) {
         val normalized = normalizeBaseUrl(url) ?: return
-        dataStore.edit { it[if (provider == 0) Keys.ANTHROPIC_BASE_URL else Keys.OPENAI_BASE_URL] = normalized }
+        dataStore.edit { it[Keys.baseUrl(provider)] = normalized }
     }
 
-    override suspend fun setActiveProvider(provider: Int) {
-        dataStore.edit { it[Keys.ACTIVE_PROVIDER] = if (provider == 0) UserSettings.ANTHROPIC else UserSettings.OPENAI }
+    override suspend fun setActiveProvider(provider: ApiProvider) {
+        dataStore.edit { it[Keys.ACTIVE_PROVIDER] = provider.storedName }
     }
 
-    override suspend fun setModel(provider: Int, model: String) {
+    override suspend fun setModel(provider: ApiProvider, model: String) {
         val trimmed = model.trim().ifEmpty { return }
-        dataStore.edit { it[if (provider == 0) Keys.ANTHROPIC_MODEL else Keys.OPENAI_MODEL] = trimmed }
+        dataStore.edit { it[Keys.model(provider)] = trimmed }
     }
 
-    override suspend fun setEffort(provider: Int, effort: String) {
+    override suspend fun setEffort(provider: ApiProvider, effort: String) {
         if (effort !in EFFORTS) return
-        dataStore.edit { it[if (provider == 0) Keys.ANTHROPIC_EFFORT else Keys.OPENAI_EFFORT] = effort }
+        dataStore.edit { it[Keys.effort(provider)] = effort }
     }
 
     override suspend fun setTheme(theme: ThemeMode) {
@@ -129,6 +129,14 @@ internal object Keys {
     val THEME = stringPreferencesKey("theme")
     val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
     val SECRETS_MIGRATED = booleanPreferencesKey("legacy_secrets_migrated")
+
+    fun apiKey(provider: ApiProvider) = if (provider == ApiProvider.Anthropic) ANTHROPIC_KEY else OPENAI_KEY
+
+    fun baseUrl(provider: ApiProvider) = if (provider == ApiProvider.Anthropic) ANTHROPIC_BASE_URL else OPENAI_BASE_URL
+
+    fun model(provider: ApiProvider) = if (provider == ApiProvider.Anthropic) ANTHROPIC_MODEL else OPENAI_MODEL
+
+    fun effort(provider: ApiProvider) = if (provider == ApiProvider.Anthropic) ANTHROPIC_EFFORT else OPENAI_EFFORT
 }
 
 /** The SharedPreferences file the app kept its plain settings in. */

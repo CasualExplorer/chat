@@ -60,7 +60,7 @@ class RetryTest {
         "event: message_stop\n" +
         """data: {"type":"message_stop"}""" + "\n\n"
 
-    private fun anthropic(url: String) = AnthropicProvider("m", "low", { "k" }, url)
+    private fun anthropic(url: String) = AnthropicProvider("m", "low", { "k" }, { url })
 
     private fun reply(p: Provider) = runBlocking { p.stream(listOf(Turn(Role.User, "hi"))).first { it !is StreamEvent.Delta } }
 

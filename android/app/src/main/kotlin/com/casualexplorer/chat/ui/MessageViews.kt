@@ -1,11 +1,11 @@
 package com.casualexplorer.chat.ui
 
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.StartOffset
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.StartOffset
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -52,14 +52,14 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.onLongClick
-import androidx.compose.ui.semantics.CustomAccessibilityAction
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontStyle
@@ -120,7 +120,12 @@ fun formatTime(epochMs: Long, zone: ZoneId = ZoneId.systemDefault()): String =
  * last of a group.
  */
 @Composable
-fun UserMessageView(item: ChatItem.Message, message: UserMessage, actions: MessageActions) {
+fun UserMessageView(
+    item: ChatItem.Message,
+    message: UserMessage,
+    actions: MessageActions,
+    modifier: Modifier = Modifier,
+) {
     // One TalkBack item per message, saying who sent it and when, with the
     // long-press actions as accessibility actions.
     val said = stringResource(R.string.message_from_you, message.text)
@@ -129,7 +134,7 @@ fun UserMessageView(item: ChatItem.Message, message: UserMessage, actions: Messa
     // The start inset keeps a user's bubble from spanning the screen, so
     // the two sides read apart.
     Column(
-        Modifier
+        modifier
             .fillMaxWidth()
             .padding(start = 56.dp, end = 16.dp)
             .clearAndSetSemantics {
@@ -184,9 +189,10 @@ fun AssistantMessageView(
     onToggleThinking: () -> Unit,
     actions: MessageActions,
     onRetry: (() -> Unit)?,
+    modifier: Modifier = Modifier,
 ) {
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        modifier.fillMaxWidth().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (message.thinking.isNotBlank()) ThinkingCard(message, expanded, onToggleThinking)

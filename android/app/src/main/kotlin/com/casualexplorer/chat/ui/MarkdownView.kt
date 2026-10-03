@@ -47,7 +47,6 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.casualexplorer.chat.core.markdown.CodeHighlighter
-import com.casualexplorer.chat.core.markdown.Markdown as MarkdownParser
 import com.casualexplorer.chat.core.markdown.MdAlign
 import com.casualexplorer.chat.core.markdown.MdBlock
 import com.casualexplorer.chat.core.markdown.MdCodeBlock
@@ -61,6 +60,7 @@ import com.casualexplorer.chat.core.markdown.MdTable
 import com.casualexplorer.chat.core.markdown.StreamingMarkdown
 import com.casualexplorer.chat.core.markdown.TokenKind
 import com.casualexplorer.chat.core.markdown.parseInline
+import com.casualexplorer.chat.core.markdown.Markdown as MarkdownParser
 
 /** How markdown is drawn. Text takes the content colour of where it is drawn. */
 @Immutable

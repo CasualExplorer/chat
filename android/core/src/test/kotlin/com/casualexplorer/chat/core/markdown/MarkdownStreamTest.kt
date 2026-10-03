@@ -383,8 +383,10 @@ class MarkdownStreamTest {
     fun relaxedBoundaryRespectsHazards() {
         val tests = mapOf(
             // Every line holds a pipe, so lineOpensConstruct rejects each candidate.
-            "long table" to (listOf("| col a | col b | col c |", "| ----- | ----- | ----- |") +
-                (2 until 1200).map { "| $it | ${it * 2} | ${it * 3} |" }).joinToString("\n"),
+            "long table" to (
+                listOf("| col a | col b | col c |", "| ----- | ----- | ----- |") +
+                    (2 until 1200).map { "| $it | ${it * 2} | ${it * 3} |" }
+                ).joinToString("\n"),
             // An open fence makes the parity odd at every candidate inside it.
             "open code fence" to "```go\n" + longProse(400),
         )

@@ -22,9 +22,8 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import javax.inject.Singleton
 
 @Module
@@ -49,14 +48,18 @@ abstract class DataModule {
          */
         @Provides
         @Singleton
-        fun settingsDataStore(@ApplicationContext context: Context, cipher: KeyCipher): DataStore<Preferences> =
-            PreferenceDataStoreFactory.create(
-                migrations = listOf(
-                    SharedPreferencesMigration(context, LEGACY_SETTINGS_PREFS),
-                    LegacySecretsMigration.forDevice(context, cipher),
-                ),
-                scope = CoroutineScope(Dispatchers.IO + SupervisorJob()),
-                produceFile = { context.preferencesDataStoreFile("user_settings") },
-            )
+        fun settingsDataStore(
+            @ApplicationContext context: Context,
+            cipher: KeyCipher,
+            @ApplicationScope scope: CoroutineScope,
+            @Dispatcher(ChatDispatchers.IO) ioDispatcher: CoroutineDispatcher,
+        ): DataStore<Preferences> = PreferenceDataStoreFactory.create(
+            migrations = listOf(
+                SharedPreferencesMigration(context, LEGACY_SETTINGS_PREFS),
+                LegacySecretsMigration.forDevice(context, cipher),
+            ),
+            scope = CoroutineScope(scope.coroutineContext + ioDispatcher),
+            produceFile = { context.preferencesDataStoreFile("user_settings") },
+        )
     }
 }

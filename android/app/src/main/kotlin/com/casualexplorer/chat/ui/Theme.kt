@@ -45,7 +45,7 @@ fun ChatTheme(
         else -> lightColorScheme()
     }
     CompositionLocalProvider(LocalCodeColors provides if (darkTheme) DarkCodeColors else LightCodeColors) {
-        MaterialTheme(colorScheme = colorScheme, content = content)
+        MaterialTheme(colorScheme = colorScheme, typography = ChatTypography, shapes = ChatShapes, content = content)
     }
 }
 

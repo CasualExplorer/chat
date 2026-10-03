@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.casualexplorer.chat.data.ApiProvider
 import com.casualexplorer.chat.data.SettingsRepository
 import com.casualexplorer.chat.data.ThemeMode
 import com.casualexplorer.chat.data.UserSettings
@@ -25,7 +26,7 @@ sealed interface SettingsUiState {
     data class Loaded(val settings: UserSettings) : SettingsUiState
 }
 
-/** What is typed in the settings' text fields; providers are numbered 0 Anthropic, 1 OpenAI. */
+/** What is typed in the settings' text fields. */
 @Immutable
 data class SettingsText(
     val anthropicKey: String = "",
@@ -33,9 +34,9 @@ data class SettingsText(
     val anthropicBaseUrl: String = "",
     val openaiBaseUrl: String = "",
 ) {
-    fun key(provider: Int) = if (provider == 0) anthropicKey else openaiKey
+    fun key(provider: ApiProvider) = if (provider == ApiProvider.Anthropic) anthropicKey else openaiKey
 
-    fun baseUrl(provider: Int) = if (provider == 0) anthropicBaseUrl else openaiBaseUrl
+    fun baseUrl(provider: ApiProvider) = if (provider == ApiProvider.Anthropic) anthropicBaseUrl else openaiBaseUrl
 }
 
 /**
@@ -66,13 +67,13 @@ class SettingsViewModel @Inject constructor(
             if (loaded) SettingsUiState.Loaded(settings) else SettingsUiState.Loading
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState.Loading)
 
-    fun setApiKey(provider: Int, key: String) {
-        text = if (provider == 0) text.copy(anthropicKey = key) else text.copy(openaiKey = key)
+    fun setApiKey(provider: ApiProvider, key: String) {
+        text = if (provider == ApiProvider.Anthropic) text.copy(anthropicKey = key) else text.copy(openaiKey = key)
         viewModelScope.launch { settingsRepository.setApiKey(provider, key) }
     }
 
-    fun setBaseUrl(provider: Int, url: String) {
-        text = if (provider == 0) text.copy(anthropicBaseUrl = url) else text.copy(openaiBaseUrl = url)
+    fun setBaseUrl(provider: ApiProvider, url: String) {
+        text = if (provider == ApiProvider.Anthropic) text.copy(anthropicBaseUrl = url) else text.copy(openaiBaseUrl = url)
         viewModelScope.launch { settingsRepository.setBaseUrl(provider, url) }
     }
 

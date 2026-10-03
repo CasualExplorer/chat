@@ -120,9 +120,13 @@ fun Flow<StreamEvent>.coalesce(windowMs: Long = STREAM_DEBOUNCE_MS): Flow<Stream
                 input.receiveCatching()
             } else {
                 val wait = deadline - System.currentTimeMillis()
-                if (wait <= 0) null else select {
-                    input.onReceiveCatching { it }
-                    onTimeout(wait) { null }
+                if (wait <= 0) {
+                    null
+                } else {
+                    select {
+                        input.onReceiveCatching { it }
+                        onTimeout(wait) { null }
+                    }
                 }
             }
             if (result == null) { // the window passed

@@ -1,5 +1,7 @@
 package com.casualexplorer.chat.core
 
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.channelFlow
@@ -26,14 +28,16 @@ class AnthropicProvider(
     override var model: String,
     override var effort: String,
     private val apiKey: () -> String,
-    /** Where the API is served; [ANTHROPIC_BASE_URL] unless set otherwise. */
-    @Volatile var baseUrl: String = ANTHROPIC_BASE_URL,
+    /** Where the API is served, read for each request; [ANTHROPIC_BASE_URL] unless set otherwise. */
+    private val baseUrlOf: () -> String = { ANTHROPIC_BASE_URL },
     client: OkHttpClient = defaultHttpClient,
     retry: RetryPolicy = RetryPolicy(),
+    /** Where response bodies are read, which blocks. */
+    ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : Provider {
     override val name = "Anthropic"
 
-    private val http = Http(name, "request-id", client, retry)
+    private val http = Http(name, "request-id", client, retry, ioDispatcher)
 
     // What listModels learned about each model, which runs while replies may
     // be streaming.
@@ -57,7 +61,7 @@ class AnthropicProvider(
         val found = mutableMapOf<String, AnthropicLimits>()
         var after = ""
         do {
-            var url = "$baseUrl/v1/models?limit=100"
+            var url = "${baseUrlOf()}/v1/models?limit=100"
             if (after.isNotEmpty()) url += "&after_id=$after"
             val page = http.getJson(url, headers(betas = false))
             val data = page.optJSONArray("data") ?: JSONArray()
@@ -130,7 +134,7 @@ class AnthropicProvider(
             val message = MessageAccumulator()
             var thought = false // a thinking summary has been streamed
             // The SDK sends beta requests with ?beta=true.
-            http.postSse("$baseUrl/v1/messages?beta=true", headers(betas = true), body) { sse ->
+            http.postSse("${baseUrlOf()}/v1/messages?beta=true", headers(betas = true), body) { sse ->
                 val event = JSONObject(sse.data)
                 if (event.optString("type") == "error") {
                     val error = event.optJSONObject("error") ?: JSONObject()
