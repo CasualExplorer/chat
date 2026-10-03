@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- NetworkMonitor: whether the device is online. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <!-- Backups are off: the API keys are encrypted with a key that stays in
          this device's keystore, so a restored copy couldn't be read anyway. -->

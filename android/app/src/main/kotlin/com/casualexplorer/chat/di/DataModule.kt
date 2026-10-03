@@ -6,11 +6,13 @@ import androidx.datastore.preferences.SharedPreferencesMigration
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStoreFile
+import com.casualexplorer.chat.data.ConnectivityManagerNetworkMonitor
 import com.casualexplorer.chat.data.DataStoreSettingsRepository
 import com.casualexplorer.chat.data.KeyCipher
 import com.casualexplorer.chat.data.KeystoreCipher
 import com.casualexplorer.chat.data.LEGACY_SETTINGS_PREFS
 import com.casualexplorer.chat.data.LegacySecretsMigration
+import com.casualexplorer.chat.data.NetworkMonitor
 import com.casualexplorer.chat.data.SettingsRepository
 import dagger.Binds
 import dagger.Module
@@ -31,6 +33,9 @@ abstract class DataModule {
 
     @Binds
     abstract fun keyCipher(impl: KeystoreCipher): KeyCipher
+
+    @Binds
+    abstract fun networkMonitor(impl: ConnectivityManagerNetworkMonitor): NetworkMonitor
 
     companion object {
         /**
