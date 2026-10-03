@@ -86,7 +86,11 @@ class ChatViewModel @Inject constructor(
             userMessage.value = "Add your ${state.providerNames.getOrElse(state.active) { "" }} API key in Settings."
             return
         }
-        if (session.submit(draft.text)) draft = TextFieldValue()
+        // Cleared first: a reply can fail before submit returns, and its
+        // message only comes back into an empty input.
+        val sent = draft
+        draft = TextFieldValue()
+        if (!session.submit(sent.text)) draft = sent
     }
 
     fun stop() = session.cancel()
