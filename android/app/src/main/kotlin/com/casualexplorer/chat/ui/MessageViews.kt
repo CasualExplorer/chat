@@ -207,7 +207,7 @@ private const val SPINNER_RUNES = "0123456789abcdefABCDEF~!@#$£€%^&*()+=_"
  */
 @Composable
 fun Spinner(label: String, startMs: Long) {
-    val ramp = remember { gradientRamp(SPINNER_SIZE * 3, Palette.Primary, Palette.Secondary, Palette.Primary, Palette.Secondary) }
+    val ramp = remember { gradientRamp(SPINNER_SIZE * 3, listOf(Palette.Primary, Palette.Secondary, Palette.Primary, Palette.Secondary)) }
     val frames = remember { Array(SPINNER_FRAMES) { CharArray(SPINNER_SIZE) { SPINNER_RUNES[Random.nextInt(SPINNER_RUNES.length)] } } }
     val birth = remember { IntArray(SPINNER_SIZE) { Random.nextInt(SPINNER_BIRTH) } }
     var age by remember { mutableIntStateOf(0) }
@@ -239,7 +239,7 @@ fun Spinner(label: String, startMs: Long) {
 }
 
 /** Blends [size] colours through the given stops. */
-private fun gradientRamp(size: Int, vararg stops: Color): List<Color> {
+private fun gradientRamp(size: Int, stops: List<Color>): List<Color> {
     val segments = stops.size - 1
     val ramp = ArrayList<Color>(size)
     for (i in 0 until segments) {
