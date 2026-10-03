@@ -1,6 +1,6 @@
 # chat for Android
 
-A native Android port of the terminal chat client in the repository root, for the OpenAI and Anthropic APIs. It is written in Kotlin with Jetpack Compose and coroutines/Flow. There are no cross-platform frameworks and no HTTP libraries: requests go through `HttpURLConnection`, server-sent events are parsed by hand, and JSON is handled with `org.json`.
+A native Android port of the terminal chat client in the repository root, for the OpenAI and Anthropic APIs. It is written in Kotlin with Jetpack Compose and coroutines/Flow. There are no cross-platform frameworks: requests go through OkHttp, server-sent events are parsed by hand, and JSON is handled with `org.json`. Failed requests are retried the way the Go SDKs do it: twice, for connection errors and 408/409/429/5xx responses, honoring `retry-after` and otherwise backing off from 0.5 s to 8 s. A reply that has started streaming is never retried.
 
 ## Build
 
@@ -42,7 +42,7 @@ Conversations are kept in memory only (in the ViewModel, so they survive rotatio
 | `core/.../Provider.kt` | `provider.go`: turns, stream events, usage, `coalesce`, `describeError`. |
 | `core/.../AnthropicProvider.kt` | `anthropic.go`: Messages API request, SSE accumulator, replay, model listing and effort limits. |
 | `core/.../OpenAIProvider.kt` | `openai.go`: Responses API request, events, replay items, model filter. |
-| `core/.../Http.kt` | `HttpURLConnection` transport, SSE parser and cancellation. |
+| `core/.../Http.kt` | OkHttp transport, the SDKs' retry policy, the SSE parser and cancellation. |
 | `core/.../ChatSession.kt` | Conversation state and the send / fail / switch logic of `ui.go` and `messages.go`. |
 | `core/.../PromptHistory.kt` | `history.go`'s prompt history. |
 | `core/.../markdown/` | `markdown_stream.go`'s stable-prefix cache over a small block and inline parser, plus the code highlighter. |

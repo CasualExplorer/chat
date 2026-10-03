@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 // The protocol, conversation and markdown logic, with no Android dependency,
 // so its tests run on the JVM.
 plugins {
+    `java-library`
     alias(libs.plugins.kotlin.jvm)
 }
 
@@ -17,6 +18,8 @@ kotlin {
 
 dependencies {
     implementation(libs.kotlinx.coroutines.core)
+    // Providers take an OkHttpClient, so it is part of this module's API.
+    api(libs.okhttp)
     // Android ships org.json; the JVM tests use the Maven Central build.
     compileOnly(libs.json)
     testImplementation(libs.json)

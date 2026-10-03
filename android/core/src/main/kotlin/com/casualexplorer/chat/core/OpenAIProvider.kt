@@ -3,11 +3,15 @@ package com.casualexplorer.chat.core
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.channelFlow
+import okhttp3.OkHttpClient
 import org.json.JSONArray
 import org.json.JSONObject
 import java.security.SecureRandom
 import java.time.LocalDate
 import java.time.format.DateTimeParseException
+
+/** The OpenAI API's own address. */
+const val OPENAI_BASE_URL = "https://api.openai.com"
 
 /** The input size, in tokens, at which the API compacts the conversation server-side. */
 const val OPENAI_COMPACT_THRESHOLD = 200_000
@@ -17,14 +21,18 @@ class OpenAIProvider(
     override var model: String,
     override var effort: String,
     private val apiKey: () -> String,
-    private val baseUrl: String = "https://api.openai.com",
+    /** Where the API is served; [OPENAI_BASE_URL] unless set otherwise. */
+    @Volatile var baseUrl: String = OPENAI_BASE_URL,
+    client: OkHttpClient = defaultHttpClient,
+    // The OpenAI SDK doesn't wait for a retry-after past two minutes.
+    retry: RetryPolicy = RetryPolicy(maxRetryAfterMs = 120_000),
 ) : Provider {
     override val name = "OpenAI"
 
     /** Routes this session's requests to the same prompt cache. */
     val cacheKey = "chat-" + randomText()
 
-    private val http = Http(name, "x-request-id")
+    private val http = Http(name, "x-request-id", client, retry)
 
     private fun headers() = mapOf("Authorization" to "Bearer ${apiKey()}")
 

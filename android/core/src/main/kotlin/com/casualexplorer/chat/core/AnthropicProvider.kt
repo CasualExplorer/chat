@@ -3,8 +3,12 @@ package com.casualexplorer.chat.core
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.channelFlow
+import okhttp3.OkHttpClient
 import org.json.JSONArray
 import org.json.JSONObject
+
+/** The Anthropic API's own address. */
+const val ANTHROPIC_BASE_URL = "https://api.anthropic.com"
 
 /** The most output a reply may use, before any lower limit the model reports. */
 const val ANTHROPIC_MAX_TOKENS = 64_000L
@@ -22,11 +26,14 @@ class AnthropicProvider(
     override var model: String,
     override var effort: String,
     private val apiKey: () -> String,
-    private val baseUrl: String = "https://api.anthropic.com",
+    /** Where the API is served; [ANTHROPIC_BASE_URL] unless set otherwise. */
+    @Volatile var baseUrl: String = ANTHROPIC_BASE_URL,
+    client: OkHttpClient = defaultHttpClient,
+    retry: RetryPolicy = RetryPolicy(),
 ) : Provider {
     override val name = "Anthropic"
 
-    private val http = Http(name, "request-id")
+    private val http = Http(name, "request-id", client, retry)
 
     // What listModels learned about each model, which runs while replies may
     // be streaming.
@@ -122,7 +129,8 @@ class AnthropicProvider(
         return channelFlow {
             val message = MessageAccumulator()
             var thought = false // a thinking summary has been streamed
-            http.postSse("$baseUrl/v1/messages", headers(betas = true), body) { sse ->
+            // The SDK sends beta requests with ?beta=true.
+            http.postSse("$baseUrl/v1/messages?beta=true", headers(betas = true), body) { sse ->
                 val event = JSONObject(sse.data)
                 if (event.optString("type") == "error") {
                     val error = event.optJSONObject("error") ?: JSONObject()

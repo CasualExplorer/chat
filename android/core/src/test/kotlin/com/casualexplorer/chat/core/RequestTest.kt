@@ -69,6 +69,7 @@ class RequestTest {
     private class Captured {
         var body = JSONObject()
         var headers: Map<String, List<String>> = emptyMap()
+        var uri = ""
     }
 
     /** Records one request and fails it, so a provider's request can be inspected without a real reply. */
@@ -77,6 +78,7 @@ class RequestTest {
         val url = server { ex ->
             captured.body = JSONObject(ex.requestBody.readBytes().decodeToString())
             captured.headers = ex.requestHeaders.mapKeys { it.key.lowercase() }
+            captured.uri = ex.requestURI.toString()
             ex.responseHeaders.add("request-id", "req_test") // Anthropic
             ex.responseHeaders.add("x-request-id", "req_test") // OpenAI
             ex.respond(400, """{"type": "error", "error": {"type": "invalid_request_error", "message": "nope"}}""")
@@ -109,6 +111,7 @@ class RequestTest {
             captured.headers["anthropic-beta"]?.joinToString(","),
         )
         assertEquals("k", captured.headers["x-api-key"]?.single())
+        assertEquals("/v1/messages?beta=true", captured.uri, "the beta Messages API, as the Go SDK calls it")
     }
 
     @Test
@@ -132,6 +135,7 @@ class RequestTest {
             assertEquals(want, jsonPath(captured.body, path), path)
         }
         assertEquals("Bearer k", captured.headers["authorization"]?.single())
+        assertEquals("/v1/responses", captured.uri)
     }
 
     @Test
