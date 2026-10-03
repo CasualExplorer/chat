@@ -94,9 +94,11 @@ class ChatScreenTest {
                 )
             }
         }
-        composeRule.onAllNodesWithText("Step 1.").assertCountEquals(0)
+        composeRule.onNodeWithText("… 19 earlier lines").assertExists()
         composeRule.onNodeWithText("Thought for 0.8s").performClick()
-        composeRule.onNodeWithText("Step 1.").assertExists()
+        composeRule.waitForIdle()
+        assertEquals("tapping the header toggles the reply's thinking", setOf(2L), expanded)
+        composeRule.onAllNodesWithText("earlier lines", substring = true).assertCountEquals(0)
     }
 
     @Test
@@ -122,5 +124,43 @@ class ChatScreenTest {
         composeRule.onAllNodesWithText("Retry").assertCountEquals(1)
         composeRule.onNodeWithText("Retry").performClick()
         assertEquals(1, retried)
+    }
+
+    @Test
+    fun theDrawerOpensAndDeletesChats() {
+        val opened = mutableListOf<Long>()
+        val deleted = mutableListOf<Long>()
+        val withChats = SampleData.conversation.copy(
+            chat = SampleData.conversation.chat.copy(
+                conversationId = 7,
+                conversations = listOf(
+                    com.casualexplorer.chat.core.ConversationSummary(7, "Reversing lists", 2),
+                    com.casualexplorer.chat.core.ConversationSummary(3, "Trip to Lisbon", 1),
+                ),
+            ),
+        )
+        composeRule.setContent {
+            ChatTheme(dynamicColor = false) {
+                ChatScreen(
+                    uiState = withChats,
+                    input = androidx.compose.ui.text.input.TextFieldValue(""),
+                    onInputChange = {}, onSend = {}, onStop = {}, onRetry = {},
+                    onHistoryPrevious = { false }, onHistoryNext = { false }, onHistoryEscape = { false },
+                    onSelectModel = { _, _ -> }, onSelectEffort = {}, onNewChat = {}, onToggleThinking = {},
+                    onUserMessageShown = {}, onOpenSettings = {},
+                    onOpenConversation = { opened += it },
+                    onDeleteConversation = { deleted += it },
+                )
+            }
+        }
+        composeRule.onNodeWithContentDescription("Show chats").performClick()
+        composeRule.onNodeWithText("Trip to Lisbon").performClick()
+        assertEquals(listOf(3L), opened)
+
+        composeRule.onNodeWithContentDescription("Show chats").performClick()
+        composeRule.onAllNodesWithContentDescription("Delete chat")[1].performClick()
+        composeRule.onNodeWithText("Delete this chat?").assertExists()
+        composeRule.onNodeWithText("Delete").performClick()
+        assertEquals(listOf(3L), deleted)
     }
 }
