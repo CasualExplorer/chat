@@ -61,6 +61,7 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import com.casualexplorer.chat.R
 import com.casualexplorer.chat.core.AssistantMessage
@@ -158,7 +159,8 @@ fun UserMessageView(item: ChatItem.Message, message: UserMessage, actions: Messa
         if (item.lastInGroup && message.createdAt > 0) {
             Text(
                 formatTime(message.createdAt),
-                style = MaterialTheme.typography.labelSmall,
+                // Laid out by its own script, so "10:41 AM" keeps its order in RTL.
+                style = MaterialTheme.typography.labelSmall.copy(textDirection = TextDirection.Content),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp, end = 4.dp),
             )
