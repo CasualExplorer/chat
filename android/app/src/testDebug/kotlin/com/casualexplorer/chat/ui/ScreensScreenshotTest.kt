@@ -4,6 +4,9 @@ import android.app.Application
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.DeviceConfigurationOverride
 import androidx.compose.ui.test.FontScale
+import androidx.compose.ui.test.LayoutDirection
+import androidx.compose.ui.test.then
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onRoot
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -26,9 +29,19 @@ class ScreensScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    private fun capture(name: String, dark: Boolean = false, fontScale: Float = 1f, content: @Composable () -> Unit) {
+    private fun capture(
+        name: String,
+        dark: Boolean = false,
+        fontScale: Float = 1f,
+        direction: LayoutDirection = LayoutDirection.Ltr,
+        content: @Composable () -> Unit,
+    ) {
         composeRule.setContent {
-            DeviceConfigurationOverride(DeviceConfigurationOverride.FontScale(fontScale)) {
+            // The layout direction is set here: Robolectric's ldrtl qualifier
+            // doesn't reach Compose.
+            DeviceConfigurationOverride(
+                DeviceConfigurationOverride.FontScale(fontScale) then DeviceConfigurationOverride.LayoutDirection(direction),
+            ) {
                 ChatTheme(darkTheme = dark, dynamicColor = false, content = content)
             }
         }
@@ -72,6 +85,5 @@ class ScreensScreenshotTest {
     fun foldable() = capture("chat_foldable") { ChatScreenSample(SampleData.conversation) }
 
     @Test
-    @Config(qualifiers = "ldrtl-w411dp-h891dp-xxhdpi")
-    fun rightToLeft() = capture("chat_rtl") { ChatScreenSample(SampleData.conversation) }
+    fun rightToLeft() = capture("chat_rtl", direction = LayoutDirection.Rtl) { ChatScreenSample(SampleData.conversation) }
 }
