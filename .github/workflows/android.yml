@@ -1,0 +1,145 @@
+name: Android
+
+on:
+  push:
+    paths:
+      - "android/**"
+      - ".github/workflows/android.yml"
+  pull_request:
+    paths:
+      - "android/**"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+    inputs:
+      record_screenshots:
+        description: "Re-record the reference screenshots and commit them (after an intended UI change)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      # Only used to commit recorded reference screenshots (see below).
+      contents: write
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v7
+
+      # Java 21: Robolectric runs SDK 35 and later only on Java 21. The app
+      # itself still compiles to Java 17 bytecode.
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      # The runner image ships the Android SDK, with ANDROID_HOME set and the
+      # licenses accepted. The Android Gradle plugin downloads any missing
+      # platform or build tools from there.
+      - name: Check Android SDK
+        run: test -d "$ANDROID_HOME" && echo "ANDROID_HOME=$ANDROID_HOME"
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Check formatting
+        run: ./gradlew --no-daemon spotlessCheck
+
+      - name: Lint
+        run: ./gradlew --no-daemon lint
+
+      # Screenshots are checked against the references in
+      # app/src/test/screenshots. They are recorded and committed instead when
+      # there are none yet, or when a manual run asks for it, never on a pull
+      # request.
+      - name: Decide screenshot mode
+        id: shots
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ] && \
+             { [ "${{ inputs.record_screenshots }}" = "true" ] || ! ls app/src/test/screenshots/*.png >/dev/null 2>&1; }; then
+            echo "mode=record" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=verify" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify screenshots
+        if: steps.shots.outputs.mode == 'verify'
+        run: ./gradlew --no-daemon verifyRoborazziDebug
+
+      - name: Record screenshots
+        if: steps.shots.outputs.mode == 'record'
+        run: ./gradlew --no-daemon recordRoborazziDebug
+
+      - name: Commit recorded screenshots
+        if: steps.shots.outputs.mode == 'record'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/test/screenshots
+          if git diff --cached --quiet; then
+            echo "Screenshots unchanged."
+          else
+            git commit -m "Record reference screenshots"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+
+      # After the screenshot tasks, as Now in Android does, so the plain test
+      # run isn't wrongly treated as up to date.
+      - name: Unit tests
+        run: ./gradlew --no-daemon test
+
+      - name: Build debug APK
+        run: ./gradlew --no-daemon assembleDebug
+
+      # The release build runs R8, which fails on missing keep rules; it is
+      # unsigned, so only built, not uploaded.
+      - name: Build release APK
+        run: ./gradlew --no-daemon assembleRelease
+
+      # Room writes the database schema to app/schemas when it compiles, and
+      # those files belong in the repository for future migrations.
+      - name: Commit Room schemas
+        if: github.event_name != 'pull_request'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/schemas
+          if git diff --cached --quiet; then
+            echo "Schemas unchanged."
+          else
+            git commit -m "Export Room schema"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: chat-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: screenshots
+          path: |
+            android/app/src/test/screenshots/
+            android/app/build/outputs/roborazzi/
+          if-no-files-found: ignore
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports
+          path: |
+            android/app/build/reports/
+            android/core/build/reports/
+          if-no-files-found: ignore

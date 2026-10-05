@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Chat</string>
+
+    <!-- Chat: top bar -->
+    <string name="switch_model">Switch model and reasoning effort</string>
+    <string name="model_subtitle">%1$s · %2$s reasoning</string>
+    <string name="context_percent">%1$d%% of context</string>
+    <string name="context_tokens">%1$s tokens</string>
+    <string name="new_chat">New chat</string>
+    <string name="chats">Chats</string>
+    <string name="open_chats">Show chats</string>
+    <string name="no_chats">Chats you start are saved here.</string>
+    <string name="delete_chat">Delete chat</string>
+    <string name="delete_chat_title">Delete this chat?</string>
+    <string name="delete_chat_text">“%1$s” and its messages will be removed from this device.</string>
+    <string name="delete">Delete</string>
+    <string name="cancel">Cancel</string>
+    <string name="settings">Settings</string>
+
+    <!-- Chat: empty state -->
+    <string name="empty_title">How can I help?</string>
+    <string name="empty_model">%1$s via %2$s</string>
+    <string name="empty_no_key">Add your %1$s API key to start chatting.</string>
+    <string name="open_settings">Open settings</string>
+
+    <!-- Chat: snackbar messages -->
+    <string name="add_key">Add your %1$s API key in Settings.</string>
+    <string name="wait_switch_model">Wait for the reply to finish (or tap Stop) before switching model.</string>
+    <string name="wait_change_effort">Wait for the reply to finish (or tap Stop) before changing reasoning effort.</string>
+    <string name="wait_new_chat">Wait for the reply to finish (or tap Stop) before starting a new chat.</string>
+    <string name="wait_open_chat">Wait for the reply to finish (or tap Stop) before opening another chat.</string>
+    <string name="wait_delete_chat">Wait for the reply to finish (or tap Stop) before deleting this chat.</string>
+
+    <!-- Chat: accessibility -->
+    <string name="message_from_you">You said: %1$s</string>
+    <string name="message_sent_at">Sent at %1$s</string>
+
+    <!-- Chat: messages -->
+    <string name="you">You</string>
+    <string name="today">Today</string>
+    <string name="yesterday">Yesterday</string>
+    <string name="thinking">Thinking…</string>
+    <string name="thinking_for">Thinking… %1$s</string>
+    <string name="thought_for">Thought for %1$s</string>
+    <string name="thinking_expanded">Expanded</string>
+    <string name="thinking_collapsed">Collapsed</string>
+    <string name="expand_thinking">Show all of the thinking</string>
+    <string name="collapse_thinking">Show only the end of the thinking</string>
+    <plurals name="lines_hidden">
+        <item quantity="one">%d earlier line</item>
+        <item quantity="other">%d earlier lines</item>
+    </plurals>
+    <string name="no_text">This reply has no text.</string>
+    <string name="stopped">Stopped</string>
+    <string name="retry">Retry</string>
+    <string name="error_label">Error</string>
+    <string name="reply_footer_tokens">%1$s in · %2$s out</string>
+    <string name="message_actions">Show message actions</string>
+    <string name="copy">Copy</string>
+    <string name="share">Share</string>
+    <string name="select_text">Select text</string>
+    <string name="copied">Copied</string>
+    <string name="close">Close</string>
+    <string name="jump_to_newest">Jump to the newest message</string>
+
+    <!-- Chat: input -->
+    <string name="message_placeholder">Message</string>
+    <string name="send">Send</string>
+    <string name="stop">Stop the reply</string>
+
+    <!-- Connection -->
+    <string name="offline">You\'re offline. Messages can\'t be sent until you\'re back online.</string>
+    <string name="offline_send">You\'re offline.</string>
+
+    <!-- Model sheet -->
+    <string name="model_sheet_title">Model</string>
+    <string name="reasoning_effort">Reasoning effort · %1$s</string>
+    <string name="effort_lowered">%1$s doesn\'t support %2$s, so requests use %3$s.</string>
+    <string name="filter_models">Filter, or type a model ID</string>
+    <string name="current_model">Current · %1$s</string>
+    <string name="use_with">Use with %1$s</string>
+
+    <!-- Settings -->
+    <string name="back">Back</string>
+    <string name="api_keys">API keys</string>
+    <string name="api_keys_note">Stored on this device only, encrypted with a key in the Android Keystore. Sent only to the provider\'s API.</string>
+    <string name="anthropic_key">Anthropic API key</string>
+    <string name="openai_key">OpenAI API key</string>
+    <string name="show_keys">Show keys</string>
+    <string name="appearance">Appearance</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="dynamic_color">Colours from wallpaper</string>
+    <string name="dynamic_color_note">Material You, on Android 12 and later</string>
+    <string name="servers">Servers</string>
+    <string name="servers_note">Leave blank for the official APIs. Use another address only for a proxy or gateway that serves the same API.</string>
+    <string name="anthropic_server">Anthropic server</string>
+    <string name="openai_server">OpenAI server</string>
+    <string name="server_invalid">Enter an https:// address (http:// only for localhost), or leave it blank.</string>
+    <string name="privacy_note">Conversations are saved on this device. OpenAI requests use store: false. Long conversations are compacted by the provider, and prompts are cached.</string>
+</resources>

@@ -12,6 +12,9 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
+// version is set at release time: -ldflags "-X main.version=cli-v1.0.0".
+var version = "dev"
+
 func main() {
 	providerName := flag.String("provider", "openai", `provider to start with: "anthropic" or "openai" (Ctrl+L switches in the app)`)
 	anthropicModel := flag.String("anthropic-model", "claude-sonnet-5-5", "Anthropic model ID")
@@ -19,7 +22,12 @@ func main() {
 	effort := flag.String("effort", "medium", "reasoning effort for both providers: low, medium, high, xhigh or max")
 	anthropicEffort := flag.String("anthropic-effort", "", "reasoning effort for Anthropic (default: -effort)")
 	openaiEffort := flag.String("openai-effort", "", "reasoning effort for OpenAI (default: -effort)")
+	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
+	if *showVersion {
+		fmt.Println("chat", version)
+		return
+	}
 
 	// Each provider keeps its own effort, which starts as -effort unless
 	// its own flag sets it.

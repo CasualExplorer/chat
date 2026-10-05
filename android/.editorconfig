@@ -1,0 +1,27 @@
+# Formatting, checked by Spotless with ktlint (./gradlew spotlessCheck;
+# ./gradlew spotlessApply fixes it), as in Now in Android.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{kt,kts}]
+# The Kotlin coding conventions (kotlin.code.style=official in gradle.properties).
+ktlint_code_style = intellij_idea
+# Long lines are left to review: some read better unwrapped.
+max_line_length = off
+# Composables are named like classes.
+ktlint_function_naming_ignore_when_annotated_with = Composable
+ij_kotlin_allow_trailing_comma = true
+ij_kotlin_allow_trailing_comma_on_call_site = true
+# Short when branches read better without blank lines between them.
+ktlint_standard_blank-line-between-when-conditions = disabled
+# && binding tighter than || is relied on in a few protocol checks.
+ktlint_standard_mixed-condition-operators = disabled
+# Expression bodies may wrap after "=" when that reads better.
+ktlint_standard_function-signature = disabled
