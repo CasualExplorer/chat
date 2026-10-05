@@ -68,21 +68,21 @@ class DataStoreSettingsRepository @Inject constructor(
         // An unreadable file reads as the defaults rather than failing the app.
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
         .map { p ->
-        val defaults = UserSettings()
-        UserSettings(
-            anthropicKey = p[Keys.ANTHROPIC_KEY]?.let(cipher::decrypt).orEmpty(),
-            openaiKey = p[Keys.OPENAI_KEY]?.let(cipher::decrypt).orEmpty(),
-            anthropicBaseUrl = p[Keys.ANTHROPIC_BASE_URL]?.let(::normalizeBaseUrl).orEmpty(),
-            openaiBaseUrl = p[Keys.OPENAI_BASE_URL]?.let(::normalizeBaseUrl).orEmpty(),
-            activeProvider = ApiProvider.fromStoredName(p[Keys.ACTIVE_PROVIDER]) ?: defaults.activeProvider,
-            anthropicModel = p[Keys.ANTHROPIC_MODEL]?.takeIf { it.isNotBlank() } ?: defaults.anthropicModel,
-            openaiModel = p[Keys.OPENAI_MODEL]?.takeIf { it.isNotBlank() } ?: defaults.openaiModel,
-            anthropicEffort = p[Keys.ANTHROPIC_EFFORT]?.takeIf { it in EFFORTS } ?: defaults.anthropicEffort,
-            openaiEffort = p[Keys.OPENAI_EFFORT]?.takeIf { it in EFFORTS } ?: defaults.openaiEffort,
-            theme = ThemeMode.entries.firstOrNull { it.name == p[Keys.THEME] } ?: defaults.theme,
-            dynamicColor = p[Keys.DYNAMIC_COLOR] ?: defaults.dynamicColor,
-        )
-    }
+            val defaults = UserSettings()
+            UserSettings(
+                anthropicKey = p[Keys.ANTHROPIC_KEY]?.let(cipher::decrypt).orEmpty(),
+                openaiKey = p[Keys.OPENAI_KEY]?.let(cipher::decrypt).orEmpty(),
+                anthropicBaseUrl = p[Keys.ANTHROPIC_BASE_URL]?.let(::normalizeBaseUrl).orEmpty(),
+                openaiBaseUrl = p[Keys.OPENAI_BASE_URL]?.let(::normalizeBaseUrl).orEmpty(),
+                activeProvider = ApiProvider.fromStoredName(p[Keys.ACTIVE_PROVIDER]) ?: defaults.activeProvider,
+                anthropicModel = p[Keys.ANTHROPIC_MODEL]?.takeIf { it.isNotBlank() } ?: defaults.anthropicModel,
+                openaiModel = p[Keys.OPENAI_MODEL]?.takeIf { it.isNotBlank() } ?: defaults.openaiModel,
+                anthropicEffort = p[Keys.ANTHROPIC_EFFORT]?.takeIf { it in EFFORTS } ?: defaults.anthropicEffort,
+                openaiEffort = p[Keys.OPENAI_EFFORT]?.takeIf { it in EFFORTS } ?: defaults.openaiEffort,
+                theme = ThemeMode.entries.firstOrNull { it.name == p[Keys.THEME] } ?: defaults.theme,
+                dynamicColor = p[Keys.DYNAMIC_COLOR] ?: defaults.dynamicColor,
+            )
+        }
         // Decrypting the keys reaches the keystore; not on the main thread.
         .flowOn(defaultDispatcher)
         .distinctUntilChanged()
