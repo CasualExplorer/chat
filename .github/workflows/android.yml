@@ -2,6 +2,10 @@ name: Android
 
 on:
   push:
+    # Path filters don't apply to tag pushes, so without this every release
+    # tag would run this workflow too.
+    branches:
+      - "**"
     paths:
       - "android/**"
       - ".github/workflows/android.yml"
@@ -30,11 +34,11 @@ jobs:
       run:
         working-directory: android
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Java 21: Robolectric runs SDK 35 and later only on Java 21. The app
       # itself still compiles to Java 17 bytecode.
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: "21"
@@ -45,7 +49,7 @@ jobs:
       - name: Check Android SDK
         run: test -d "$ANDROID_HOME" && echo "ANDROID_HOME=$ANDROID_HOME"
 
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
 
       - name: Check formatting
         run: ./gradlew --no-daemon spotlessCheck
@@ -101,24 +105,21 @@ jobs:
       - name: Build release APK
         run: ./gradlew --no-daemon assembleRelease
 
-      # Room writes the database schema to app/schemas when it compiles, and
-      # those files belong in the repository for future migrations.
-      - name: Commit Room schemas
-        if: github.event_name != 'pull_request'
+      # Room writes the database schema to app/schemas when it compiles. A
+      # change must be committed by hand, with the database version raised and
+      # a migration added: a changed schema under the same version crashes
+      # the app on phones that have the old database.
+      - name: Check Room schemas
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app/schemas
-          if git diff --cached --quiet; then
-            echo "Schemas unchanged."
-          else
-            git commit -m "Export Room schema"
-            git pull --rebase origin "${GITHUB_REF_NAME}"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
+          if [ -n "$(git status --porcelain app/schemas)" ]; then
+            git status --porcelain app/schemas
+            git diff app/schemas
+            echo "::error::The Room schema changed. Raise the version in ChatDatabase, add a migration, and commit app/schemas."
+            exit 1
           fi
 
       - name: Upload debug APK
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: chat-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
@@ -126,7 +127,7 @@ jobs:
 
       - name: Upload screenshots
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: screenshots
           path: |
@@ -136,7 +137,7 @@ jobs:
 
       - name: Upload reports
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: reports
           path: |

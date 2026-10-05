@@ -17,7 +17,7 @@ android {
         minSdk = 26
         // Google Play requires API 36 for new apps and updates from 2026-08-31.
         targetSdk = 36
-        // A release build sets these from its tag (see release.yml).
+        // A release build sets these from its tag (see android-release.yml).
         versionCode = System.getenv("VERSION_CODE")?.toInt() ?: 1
         versionName = System.getenv("VERSION_NAME") ?: "0.1.0"
     }

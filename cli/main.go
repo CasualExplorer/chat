@@ -12,7 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// version is set at release time: -ldflags "-X main.version=cli-v1.0.0".
+// version is set at release time: -ldflags "-X main.version=1.0.0" (the tag without "cli-v").
 var version = "dev"
 
 func main() {
