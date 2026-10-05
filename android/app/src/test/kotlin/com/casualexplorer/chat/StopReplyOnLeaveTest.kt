@@ -14,6 +14,8 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -39,12 +41,16 @@ class StopReplyOnLeaveTest {
     }
 
     @Test
-    fun leavingTheAppStopsTheReplyAndKeepsWhatArrived() = runTest {
+    fun leavingTheAppStopsTheReplyAfterTheGraceAndKeepsWhatArrived() = runTest {
         val session = ChatSession(listOf(SlowProvider()), 0, InMemoryConversationStore(), backgroundScope, debounceMs = 0)
         assertTrue(session.submit("hi"))
         session.state.first { s -> (s.messages.lastOrNull() as? AssistantMessage)?.text == "Hel" }
 
-        StopReplyOnLeave { TestChatRepository(session) }.onStop(owner)
+        StopReplyOnLeave({ TestChatRepository(session) }, backgroundScope, graceMs = 1_000).onStop(owner)
+        advanceTimeBy(999)
+        runCurrent()
+        assertTrue("still streaming within the grace period", session.state.value.streaming)
+        advanceTimeBy(2)
 
         val ended = session.state.first { !it.streaming && (it.messages.last() as? AssistantMessage)?.pending == false }
         val reply = ended.messages.last() as AssistantMessage
@@ -53,9 +59,26 @@ class StopReplyOnLeaveTest {
     }
 
     @Test
+    fun comingBackWithinTheGraceKeepsTheReply() = runTest {
+        val session = ChatSession(listOf(SlowProvider()), 0, InMemoryConversationStore(), backgroundScope, debounceMs = 0)
+        assertTrue(session.submit("hi"))
+        session.state.first { s -> (s.messages.lastOrNull() as? AssistantMessage)?.text == "Hel" }
+
+        val observer = StopReplyOnLeave({ TestChatRepository(session) }, backgroundScope, graceMs = 1_000)
+        observer.onStop(owner)
+        advanceTimeBy(500)
+        observer.onStart(owner)
+        advanceTimeBy(5_000)
+        runCurrent()
+        assertTrue(session.state.value.streaming)
+    }
+
+    @Test
     fun leavingWithNoReplyStreamingDoesNothing() = runTest {
         val session = ChatSession(listOf(SlowProvider()), 0, InMemoryConversationStore(), backgroundScope, debounceMs = 0)
-        StopReplyOnLeave { TestChatRepository(session) }.onStop(owner)
+        StopReplyOnLeave({ TestChatRepository(session) }, backgroundScope, graceMs = 1_000).onStop(owner)
+        advanceTimeBy(2_000)
+        runCurrent()
         assertEquals(false, session.state.value.streaming)
     }
 }

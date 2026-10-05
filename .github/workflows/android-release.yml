@@ -16,14 +16,31 @@ jobs:
       run:
         working-directory: android
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: "21"
 
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+
+      - name: Unit tests
+        run: ./gradlew --no-daemon test
+
+      # The version code comes from the tag, so it always grows with the
+      # version, whatever happens to this workflow's run counter: X.Y.Z is
+      # X*1000000 + Y*1000 + Z. (The first APK, v0.1.0, was version code 1.)
+      - name: Work out the version
+        run: |
+          VERSION="${GITHUB_REF_NAME#android-v}"
+          if ! [[ "$VERSION" =~ ^([0-9]+)\.([0-9]{1,3})\.([0-9]{1,3})$ ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME is not android-vX.Y.Z"
+            exit 1
+          fi
+          CODE=$(( BASH_REMATCH[1] * 1000000 + 10#${BASH_REMATCH[2]} * 1000 + 10#${BASH_REMATCH[3]} ))
+          echo "VERSION_NAME=$VERSION" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$CODE" >> "$GITHUB_ENV"
 
       - name: Decode the keystore
         env:
@@ -36,8 +53,7 @@ jobs:
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
-          VERSION_CODE: ${{ github.run_number }}
-        run: VERSION_NAME="${GITHUB_REF_NAME#android-v}" ./gradlew --no-daemon assembleRelease
+        run: ./gradlew --no-daemon assembleRelease
 
       - name: Create the release
         env:
@@ -45,4 +61,4 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#android-v}"
           cp app/build/outputs/apk/release/app-release.apk "chat-android-${VERSION}.apk"
-          gh release create "$GITHUB_REF_NAME" "chat-android-${VERSION}.apk" --title "Android ${VERSION}" --generate-notes
+          gh release create "$GITHUB_REF_NAME" "chat-android-${VERSION}.apk" ../THIRD_PARTY_NOTICES.md --title "Android ${VERSION}" --generate-notes

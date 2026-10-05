@@ -3,8 +3,10 @@ package com.casualexplorer.chat.data
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import java.security.GeneralSecurityException
+import java.security.InvalidKeyException
 import java.security.KeyStore
 import java.security.ProviderException
+import java.security.UnrecoverableKeyException
 import java.util.Base64
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -32,16 +34,24 @@ class KeystoreCipher @Inject constructor() : KeyCipher {
         if (plain.isEmpty()) return ""
         return try {
             encryptOnce(plain)
-        } catch (_: GeneralSecurityException) {
+        } catch (_: InvalidKeyException) {
+            // KeyPermanentlyInvalidatedException among them.
+            retryWithNewKey(plain)
+        } catch (_: UnrecoverableKeyException) {
             retryWithNewKey(plain)
         } catch (_: ProviderException) {
-            retryWithNewKey(plain)
+            // Often a passing keystore failure: try again with the same key.
+            encryptOnce(plain)
         }
     }
 
-    /** A broken or invalidated keystore key is replaced once; a second failure is the caller's to handle. */
+    /**
+     * Only a key that can no longer be used is replaced, once: the other
+     * provider's key is encrypted with it too and becomes unreadable. A
+     * second failure is the caller's to handle.
+     */
     private fun retryWithNewKey(plain: String): String {
-        KeyStore.getInstance(KEYSTORE).apply { load(null) }.deleteEntry(ALIAS)
+        synchronized(this) { KeyStore.getInstance(KEYSTORE).apply { load(null) }.deleteEntry(ALIAS) }
         return encryptOnce(plain)
     }
 
@@ -67,6 +77,8 @@ class KeystoreCipher @Inject constructor() : KeyCipher {
         }
     }
 
+    /** Synchronized so concurrent first uses can't each generate a key, one replacing the other. */
+    @Synchronized
     private fun key(): SecretKey {
         val store = KeyStore.getInstance(KEYSTORE).apply { load(null) }
         (store.getKey(ALIAS, null) as? SecretKey)?.let { return it }

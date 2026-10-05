@@ -72,7 +72,7 @@ The interface follows [Crush](https://github.com/charmbracelet/crush): its dark 
 
 Crush features left out on purpose: saved sessions, themes, `/` and `@` completions, attachments, desktop notifications, the details panel and Toggle Sidebar command for small terminals, scrolling the sidebar, Ctrl+Z to suspend (Windows has no job control), the terminal progress bar and a window title with the directory, the mouse, transparency and thinking toggles, and setting API keys in the app.
 
-The adapted code (`list/`, `xchroma/`, `styles.go`, `spinner.go`, `logo.go`, `layout.go`, `chat.go`, `messages.go`, `markdown_stream.go`, `dialog.go`, `keys.go`, `history.go`) is Copyright 2025-2026 Charmbracelet, Inc., used under [FSL-1.1-MIT](https://github.com/charmbracelet/crush/blob/main/LICENSE.md), which permits use other than in a competing commercial product. The logo spells this app's name rather than Crush's, which is Charm's trademark.
+The adapted code (`list/`, `xchroma/`, `styles.go`, `spinner.go`, `logo.go`, `layout.go`, `chat.go`, `messages.go`, `markdown_stream.go`, `dialog.go`, `keys.go`, `history.go`, `framecache.go`) is Copyright 2025-2026 Charmbracelet, Inc., used under [FSL-1.1-MIT](https://github.com/charmbracelet/crush/blob/main/LICENSE.md), which permits use other than in a competing commercial product. The logo spells this app's name rather than Crush's, which is Charm's trademark.
 
 While a model reasons, a summary of its reasoning streams in a muted box above the reply (Anthropic `thinking.display: "summarized"`, OpenAI `reasoning.summary: "auto"`). Summaries are display-only: they're not counted as reply text.
 
