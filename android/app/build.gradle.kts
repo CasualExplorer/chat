@@ -17,8 +17,23 @@ android {
         minSdk = 26
         // Google Play requires API 36 for new apps and updates from 2026-08-31.
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        // A release build sets these from its tag (see release.yml).
+        versionCode = System.getenv("VERSION_CODE")?.toInt() ?: 1
+        versionName = System.getenv("VERSION_NAME") ?: "0.1.0"
+    }
+
+    // The release workflow supplies the keystore; without it the release build
+    // is left unsigned, as in CI and on a clone with no key.
+    val releaseKeystore = System.getenv("RELEASE_KEYSTORE_FILE")?.let(::file)
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("RELEASE_KEY_ALIAS")
+                keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
@@ -28,6 +43,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (releaseKeystore != null) signingConfig = signingConfigs.getByName("release")
         }
     }
 
