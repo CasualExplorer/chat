@@ -98,6 +98,6 @@
     <string name="servers_note">Leave blank for the official APIs. Use another address only for a proxy or gateway that serves the same API.</string>
     <string name="anthropic_server">Anthropic server</string>
     <string name="openai_server">OpenAI server</string>
-    <string name="server_invalid">Enter an http:// or https:// address, or leave it blank.</string>
+    <string name="server_invalid">Enter an https:// address (http:// only for localhost), or leave it blank.</string>
     <string name="privacy_note">Conversations are saved on this device. OpenAI requests use store: false. Long conversations are compacted by the provider, and prompts are cached.</string>
 </resources>

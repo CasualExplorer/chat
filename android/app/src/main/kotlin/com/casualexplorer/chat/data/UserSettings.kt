@@ -76,16 +76,27 @@ enum class ApiProvider(val index: Int, val storedName: String) {
 /** Light, dark, or following the system. */
 enum class ThemeMode { System, Light, Dark }
 
+/** Hosts that may use plain http, matching res/xml/network_security_config.xml (local gateways and the emulator's host). */
+private val CLEARTEXT_HOSTS = setOf("localhost", "127.0.0.1", "10.0.2.2")
+
 /**
  * A server address as stored: trimmed, without a trailing slash, blank for
- * the official API. It returns null if [url] is neither blank nor an
- * http(s) URL.
+ * the official API. It returns null if [url] is neither blank nor an https
+ * URL, or an http URL for a local host; the API key would otherwise go in
+ * plain text (and the platform blocks cleartext to other hosts anyway).
  */
 fun normalizeBaseUrl(url: String): String? {
     val trimmed = url.trim().trimEnd('/')
     if (trimmed.isEmpty()) return ""
     val lower = trimmed.lowercase()
-    if (!lower.startsWith("https://") && !lower.startsWith("http://")) return null
-    if (trimmed.substringAfter("://").isEmpty()) return null
-    return trimmed
+    val rest = trimmed.substringAfter("://")
+    if (rest.isEmpty()) return null
+    return when {
+        lower.startsWith("https://") -> trimmed
+        lower.startsWith("http://") -> {
+            val host = rest.substringBefore('/').substringBefore('?').substringBefore(':')
+            if (host.lowercase() in CLEARTEXT_HOSTS) trimmed else null
+        }
+        else -> null
+    }
 }

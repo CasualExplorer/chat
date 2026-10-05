@@ -170,6 +170,9 @@ class SettingsRepositoryTest {
         assertEquals("", normalizeBaseUrl("  "))
         assertEquals("https://a.example/v", normalizeBaseUrl(" https://a.example/v/ "))
         assertEquals("http://10.0.2.2:8080", normalizeBaseUrl("http://10.0.2.2:8080"))
+        assertEquals("http://localhost:11434/v1", normalizeBaseUrl("HTTP://localhost:11434/v1"))
+        assertNull(normalizeBaseUrl("http://api.example.com"))
+        assertNull(normalizeBaseUrl("http://10.0.2.2.evil.example"))
         assertNull(normalizeBaseUrl("api.example.com"))
         assertNull(normalizeBaseUrl("https://"))
     }

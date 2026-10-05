@@ -4,9 +4,11 @@ import android.content.Context
 import android.util.Log
 import androidx.datastore.core.DataMigration
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
@@ -15,10 +17,14 @@ import com.casualexplorer.chat.di.ChatDispatchers
 import com.casualexplorer.chat.di.Dispatcher
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import java.io.File
+import java.io.IOException
+import java.security.GeneralSecurityException
+import java.security.ProviderException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -58,7 +64,10 @@ class DataStoreSettingsRepository @Inject constructor(
     private val cipher: KeyCipher,
     @Dispatcher(ChatDispatchers.Default) defaultDispatcher: CoroutineDispatcher,
 ) : SettingsRepository {
-    override val settings: Flow<UserSettings> = dataStore.data.map { p ->
+    override val settings: Flow<UserSettings> = dataStore.data
+        // An unreadable file reads as the defaults rather than failing the app.
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { p ->
         val defaults = UserSettings()
         UserSettings(
             anthropicKey = p[Keys.ANTHROPIC_KEY]?.let(cipher::decrypt).orEmpty(),
@@ -78,36 +87,49 @@ class DataStoreSettingsRepository @Inject constructor(
         .flowOn(defaultDispatcher)
         .distinctUntilChanged()
 
+    /** Writes to the store; a failed write (disk, keystore) is logged, not thrown, so no caller crashes. */
+    private suspend fun edit(transform: (MutablePreferences) -> Unit) {
+        try {
+            dataStore.edit(transform)
+        } catch (e: IOException) {
+            Log.w("Settings", "Couldn't save settings", e)
+        } catch (e: GeneralSecurityException) {
+            Log.w("Settings", "Couldn't encrypt the API key", e)
+        } catch (e: ProviderException) {
+            Log.w("Settings", "Couldn't encrypt the API key", e)
+        }
+    }
+
     override suspend fun setApiKey(provider: ApiProvider, key: String) {
         // Encrypted inside the edit, on DataStore's own thread: the keystore is slow.
-        dataStore.edit { it[Keys.apiKey(provider)] = cipher.encrypt(key.trim()) }
+        edit { it[Keys.apiKey(provider)] = cipher.encrypt(key.trim()) }
     }
 
     override suspend fun setBaseUrl(provider: ApiProvider, url: String) {
         val normalized = normalizeBaseUrl(url) ?: return
-        dataStore.edit { it[Keys.baseUrl(provider)] = normalized }
+        edit { it[Keys.baseUrl(provider)] = normalized }
     }
 
     override suspend fun setActiveProvider(provider: ApiProvider) {
-        dataStore.edit { it[Keys.ACTIVE_PROVIDER] = provider.storedName }
+        edit { it[Keys.ACTIVE_PROVIDER] = provider.storedName }
     }
 
     override suspend fun setModel(provider: ApiProvider, model: String) {
         val trimmed = model.trim().ifEmpty { return }
-        dataStore.edit { it[Keys.model(provider)] = trimmed }
+        edit { it[Keys.model(provider)] = trimmed }
     }
 
     override suspend fun setEffort(provider: ApiProvider, effort: String) {
         if (effort !in EFFORTS) return
-        dataStore.edit { it[Keys.effort(provider)] = effort }
+        edit { it[Keys.effort(provider)] = effort }
     }
 
     override suspend fun setTheme(theme: ThemeMode) {
-        dataStore.edit { it[Keys.THEME] = theme.name }
+        edit { it[Keys.THEME] = theme.name }
     }
 
     override suspend fun setDynamicColor(enabled: Boolean) {
-        dataStore.edit { it[Keys.DYNAMIC_COLOR] = enabled }
+        edit { it[Keys.DYNAMIC_COLOR] = enabled }
     }
 }
 

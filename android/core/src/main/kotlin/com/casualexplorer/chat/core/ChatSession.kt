@@ -227,11 +227,14 @@ class ChatSession(
     private var chosen = false
 
     private val opening: Job = scope.launch {
-        recoverInterrupted()
-        val latest = store.latestConversationId()
-        if (!chosen && latest != null) {
-            conversationId.value = latest
-            restoreUsage(latest)
+        // If the store can't be read, start with an empty chat rather than crash.
+        tryStore {
+            recoverInterrupted()
+            val latest = store.latestConversationId()
+            if (!chosen && latest != null) {
+                conversationId.value = latest
+                restoreUsage(latest)
+            }
         }
     }
 
@@ -389,7 +392,7 @@ class ChatSession(
         }
     }
 
-    /** Runs [write], ignoring a failure of the store: the reply on screen already says how it ended. */
+    /** Runs [write], ignoring a failure of the store: the reply on screen already says how it ended, and a missed read or delete is not worth a crash. */
     private suspend fun tryStore(write: suspend () -> Unit) {
         try {
             write()
@@ -493,7 +496,7 @@ class ChatSession(
         val open = conversationId.value == id
         if (open && config.value.streaming) return "Wait for the reply to finish (or tap Stop) before deleting this chat."
         if (open) newChat()
-        scope.launch { store.deleteConversation(id) }
+        scope.launch { tryStore { store.deleteConversation(id) } }
         return null
     }
 

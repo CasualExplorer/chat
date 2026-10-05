@@ -107,6 +107,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.hilt.android)
     implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.profileinstaller)
     ksp(libs.hilt.compiler)
     ksp(libs.kotlin.metadata)
 

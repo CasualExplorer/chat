@@ -4,6 +4,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import java.security.GeneralSecurityException
 import java.security.KeyStore
+import java.security.ProviderException
 import java.util.Base64
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -29,6 +30,22 @@ interface KeyCipher {
 class KeystoreCipher @Inject constructor() : KeyCipher {
     override fun encrypt(plain: String): String {
         if (plain.isEmpty()) return ""
+        return try {
+            encryptOnce(plain)
+        } catch (_: GeneralSecurityException) {
+            retryWithNewKey(plain)
+        } catch (_: ProviderException) {
+            retryWithNewKey(plain)
+        }
+    }
+
+    /** A broken or invalidated keystore key is replaced once; a second failure is the caller's to handle. */
+    private fun retryWithNewKey(plain: String): String {
+        KeyStore.getInstance(KEYSTORE).apply { load(null) }.deleteEntry(ALIAS)
+        return encryptOnce(plain)
+    }
+
+    private fun encryptOnce(plain: String): String {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, key())
         return Base64.getEncoder().encodeToString(cipher.iv + cipher.doFinal(plain.toByteArray()))
@@ -42,6 +59,8 @@ class KeystoreCipher @Inject constructor() : KeyCipher {
             cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(TAG_BITS, bytes, 0, IV_BYTES))
             String(cipher.doFinal(bytes, IV_BYTES, bytes.size - IV_BYTES))
         } catch (_: GeneralSecurityException) {
+            null
+        } catch (_: ProviderException) {
             null
         } catch (_: IllegalArgumentException) {
             null

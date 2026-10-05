@@ -1,10 +1,12 @@
 package com.casualexplorer.chat.di
 
+import android.util.Log
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -50,5 +52,9 @@ object CoroutinesModule {
     @Provides
     @Singleton
     @ApplicationScope
-    fun applicationScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    fun applicationScope(): CoroutineScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Main.immediate +
+            // A backstop: failures are handled where they happen, this keeps a missed one from killing the app.
+            CoroutineExceptionHandler { _, e -> Log.e("ChatApp", "Uncaught error in the application scope", e) },
+    )
 }

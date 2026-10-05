@@ -2,9 +2,11 @@ package com.casualexplorer.chat.di
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.SharedPreferencesMigration
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.preferencesDataStoreFile
 import com.casualexplorer.chat.data.ChatRepository
 import com.casualexplorer.chat.data.ConnectivityManagerNetworkMonitor
@@ -54,6 +56,7 @@ abstract class DataModule {
             @ApplicationScope scope: CoroutineScope,
             @Dispatcher(ChatDispatchers.IO) ioDispatcher: CoroutineDispatcher,
         ): DataStore<Preferences> = PreferenceDataStoreFactory.create(
+            corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
             migrations = listOf(
                 SharedPreferencesMigration(context, LEGACY_SETTINGS_PREFS),
                 LegacySecretsMigration.forDevice(context, cipher),

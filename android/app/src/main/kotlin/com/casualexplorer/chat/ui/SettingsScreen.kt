@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
@@ -37,6 +38,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -55,6 +57,9 @@ import com.casualexplorer.chat.data.ApiProvider
 import com.casualexplorer.chat.data.ThemeMode
 import com.casualexplorer.chat.data.UserSettings
 import com.casualexplorer.chat.data.normalizeBaseUrl
+
+/** How wide the settings get on a large screen. */
+private val MAX_CONTENT_WIDTH = 640.dp
 
 /** The settings screen, connected to [vm]. [onDone] leaves it. */
 @Composable
@@ -112,56 +117,59 @@ fun SettingsScreen(
             )
         },
     ) { padding ->
-        Column(
-            Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .consumeWindowInsets(padding)
-                .imePadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Section(stringResource(R.string.api_keys))
-            Note(stringResource(R.string.api_keys_note))
-            SecretField(stringResource(R.string.anthropic_key), text.anthropicKey, showKeys) { onApiKeyChange(ApiProvider.Anthropic, it) }
-            SecretField(stringResource(R.string.openai_key), text.openaiKey, showKeys) { onApiKeyChange(ApiProvider.OpenAI, it) }
-            SwitchRow(stringResource(R.string.show_keys), null, showKeys) { showKeys = it }
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+            Column(
+                Modifier
+                    .widthIn(max = MAX_CONTENT_WIDTH)
+                    .fillMaxSize()
+                    .padding(padding)
+                    .consumeWindowInsets(padding)
+                    .imePadding()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Section(stringResource(R.string.api_keys))
+                Note(stringResource(R.string.api_keys_note))
+                SecretField(stringResource(R.string.anthropic_key), text.anthropicKey, showKeys) { onApiKeyChange(ApiProvider.Anthropic, it) }
+                SecretField(stringResource(R.string.openai_key), text.openaiKey, showKeys) { onApiKeyChange(ApiProvider.OpenAI, it) }
+                SwitchRow(stringResource(R.string.show_keys), null, showKeys) { showKeys = it }
 
-            HorizontalDivider()
-            Section(stringResource(R.string.appearance))
-            val themes = listOf(
-                ThemeMode.System to stringResource(R.string.theme_system),
-                ThemeMode.Light to stringResource(R.string.theme_light),
-                ThemeMode.Dark to stringResource(R.string.theme_dark),
-            )
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                themes.forEachIndexed { i, (mode, label) ->
-                    SegmentedButton(
-                        selected = settings.theme == mode,
-                        onClick = { onThemeChange(mode) },
-                        shape = SegmentedButtonDefaults.itemShape(i, themes.size),
-                    ) { Text(label) }
-                }
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                SwitchRow(
-                    stringResource(R.string.dynamic_color),
-                    stringResource(R.string.dynamic_color_note),
-                    settings.dynamicColor,
-                    onDynamicColorChange,
+                HorizontalDivider()
+                Section(stringResource(R.string.appearance))
+                val themes = listOf(
+                    ThemeMode.System to stringResource(R.string.theme_system),
+                    ThemeMode.Light to stringResource(R.string.theme_light),
+                    ThemeMode.Dark to stringResource(R.string.theme_dark),
                 )
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    themes.forEachIndexed { i, (mode, label) ->
+                        SegmentedButton(
+                            selected = settings.theme == mode,
+                            onClick = { onThemeChange(mode) },
+                            shape = SegmentedButtonDefaults.itemShape(i, themes.size),
+                        ) { Text(label) }
+                    }
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    SwitchRow(
+                        stringResource(R.string.dynamic_color),
+                        stringResource(R.string.dynamic_color_note),
+                        settings.dynamicColor,
+                        onDynamicColorChange,
+                    )
+                }
+
+                HorizontalDivider()
+                Section(stringResource(R.string.servers))
+                Note(stringResource(R.string.servers_note))
+                UrlField(stringResource(R.string.anthropic_server), text.anthropicBaseUrl, ANTHROPIC_BASE_URL) { onBaseUrlChange(ApiProvider.Anthropic, it) }
+                UrlField(stringResource(R.string.openai_server), text.openaiBaseUrl, OPENAI_BASE_URL) { onBaseUrlChange(ApiProvider.OpenAI, it) }
+
+                HorizontalDivider()
+                Note(stringResource(R.string.privacy_note))
+                Spacer(Modifier.height(8.dp))
             }
-
-            HorizontalDivider()
-            Section(stringResource(R.string.servers))
-            Note(stringResource(R.string.servers_note))
-            UrlField(stringResource(R.string.anthropic_server), text.anthropicBaseUrl, ANTHROPIC_BASE_URL) { onBaseUrlChange(ApiProvider.Anthropic, it) }
-            UrlField(stringResource(R.string.openai_server), text.openaiBaseUrl, OPENAI_BASE_URL) { onBaseUrlChange(ApiProvider.OpenAI, it) }
-
-            HorizontalDivider()
-            Note(stringResource(R.string.privacy_note))
-            Spacer(Modifier.height(8.dp))
         }
     }
 }
