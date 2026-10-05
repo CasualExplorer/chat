@@ -1,11 +1,11 @@
-name: Release
+name: Android release
 
-# Pushing a tag such as v0.1.0 builds a signed APK and attaches it to a GitHub
+# Pushing a tag such as android-v0.1.0 builds a signed APK and attaches it to a GitHub
 # release, which can be downloaded on a phone.
 on:
   push:
     tags:
-      - "v*"
+      - "android-v*"
 
 jobs:
   release:
@@ -36,14 +36,13 @@ jobs:
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
-          VERSION_NAME: ${{ github.ref_name }}
           VERSION_CODE: ${{ github.run_number }}
-        run: ./gradlew --no-daemon assembleRelease
+        run: VERSION_NAME="${GITHUB_REF_NAME#android-v}" ./gradlew --no-daemon assembleRelease
 
       - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          cp app/build/outputs/apk/release/app-release.apk "chat-${VERSION}.apk"
-          gh release create "$GITHUB_REF_NAME" "chat-${VERSION}.apk" --title "$GITHUB_REF_NAME" --generate-notes
+          VERSION="${GITHUB_REF_NAME#android-v}"
+          cp app/build/outputs/apk/release/app-release.apk "chat-android-${VERSION}.apk"
+          gh release create "$GITHUB_REF_NAME" "chat-android-${VERSION}.apk" --title "Android ${VERSION}" --generate-notes
